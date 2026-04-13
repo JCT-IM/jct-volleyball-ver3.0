@@ -31,6 +31,7 @@ const PlayerInputScreen: React.FC<PlayerInputScreenProps> = ({ onStart }) => {
     const [phase, setPhase] = useState<'input' | 'exclude'>('input');
     const [allPlayers, setAllPlayers] = useState<Omit<Player, 'id' | 'anonymousName' | 'isCaptain' | 'totalScore'>[]>([]);
     const [excludedPlayerNames, setExcludedPlayerNames] = useState<Set<string>>(new Set());
+    const [dynamicEvalHeaders, setDynamicEvalHeaders] = useState<string[]>([]);
 
     useEffect(() => {
         if (settings.googleSheetUrl) {
@@ -92,6 +93,13 @@ const PlayerInputScreen: React.FC<PlayerInputScreenProps> = ({ onStart }) => {
         return -1;
     };
 
+    const isNumericCell = (value: string | undefined): boolean => {
+        if (!value) return false;
+        const trimmed = value.trim();
+        if (!trimmed || trimmed.toLowerCase() === 'null' || trimmed.toLowerCase() === 'undefined') return false;
+        return !Number.isNaN(Number(trimmed));
+    };
+
     const handleParseAndProceed = useCallback((e: React.FormEvent) => {
         e.preventDefault();
         
@@ -103,7 +111,7 @@ const PlayerInputScreen: React.FC<PlayerInputScreenProps> = ({ onStart }) => {
 
         const headers = lines[0].split(',').map(h => h.trim());
         
-        // Fuzzy Matching으로 헤더 인덱스 찾기
+        // 필수 + PAPS(고정) 헤더 인덱스 찾기
         const headerMapping: Record<string, number> = {
             '번호': findHeaderIndex(headers, ['번호', '학번', 'id']),
             '이름': findHeaderIndex(headers, ['이름', '성명', 'name']),
@@ -112,8 +120,8 @@ const PlayerInputScreen: React.FC<PlayerInputScreenProps> = ({ onStart }) => {
             '셔틀런': findHeaderIndex(headers, ['셔틀런', '심폐', '지구력', '심폐지구력', '오래달리기', '왕복', 'shuttle']),
             '유연성': findHeaderIndex(headers, ['유연성', '좌전굴', '스트레칭', 'flexibility']),
             '50m달리기': findHeaderIndex(headers, ['50m', '달리기', '순발력', '100m', 'dash']),
-            '언더핸드': findHeaderIndex(headers, ['언더', '리시브', '패스', 'underhand']),
-            '서브': findHeaderIndex(headers, ['서브', '공격', '스파이크', 'serve']),
+            '언더핸드': -1,
+            '서브': -1,
         };
 
         // 필수 헤더 확인 (번호, 이름, 성별)
@@ -123,61 +131,52 @@ const PlayerInputScreen: React.FC<PlayerInputScreenProps> = ({ onStart }) => {
         }
 
         // 통계 헤더는 선택 사항 - 누락되어도 오류 없이 진행
-        const statHeaderKeys = ['키', '셔틀런', '유연성', '50m달리기', '언더핸드', '서브']; // 내부 키는 유지, 표시명만 변경
-        
-        // 순서 기반 Fallback: 키워드 매칭이 실패한 경우 순서로 강제 할당
-        // 마지막에서 두 번째 컬럼 → skill1 (underhand)
-        // 맨 마지막 컬럼 → skill2 (serve)
-        const totalHeaders = headers.length;
-        const expectedStatStartIndex = 3; // 번호(0), 이름(1), 성별(2) 다음부터 통계 데이터
-        
-        // 커스텀 라벨 추출 및 저장 (초기화)
+        const statHeaderKeys = ['키', '셔틀런', '유연성', '50m달리기', '언더핸드', '서브'];
+
+        // 동적 평가 헤더 파싱:
+        // 필수 + PAPS(고정) 열을 제외한 나머지 유효 헤더를 평가 항목으로 인식
+        const reservedIndexes = new Set<number>(
+            ['번호', '이름', '성별', '키', '셔틀런', '유연성', '50m달리기']
+                .map(key => headerMapping[key])
+                .filter((idx): idx is number => idx >= 0)
+        );
+
+        const parsedRows = lines.slice(1).map(line => line.split(',').map(v => v.trim()));
+        const dynamicHeaderInfos = headers
+            .map((text, index) => ({ text: text.trim(), index }))
+            .filter(({ text, index }) => text !== '' && !reservedIndexes.has(index))
+            .filter(({ index }) => parsedRows.some(row => isNumericCell(row[index])));
+
+        const evalHeaders = dynamicHeaderInfos.map(h => h.text);
+        setDynamicEvalHeaders(evalHeaders);
+
+        const skill1Info = dynamicHeaderInfos[0];
+        const skill2Info = dynamicHeaderInfos[1];
+        headerMapping['언더핸드'] = skill1Info?.index ?? -1;
+        headerMapping['서브'] = skill2Info?.index ?? -1;
+
+        // 커스텀 라벨 추출 및 저장
         const customLabels: CustomLabels = {};
-        
-        // 언더핸드(skill1)가 매칭되지 않았고, 마지막에서 두 번째 컬럼이 있으면 강제 할당
-        if (headerMapping['언더핸드'] === -1 && totalHeaders >= expectedStatStartIndex + STAT_KEYS.length - 1) {
-            const fallbackIndex = totalHeaders - 2; // 마지막에서 두 번째
-            if (fallbackIndex >= expectedStatStartIndex && fallbackIndex < totalHeaders) {
-                headerMapping['언더핸드'] = fallbackIndex;
-                // fallback으로 할당된 경우에도 헤더 이름을 커스텀 라벨로 저장
-                if (headers[fallbackIndex]) {
-                    customLabels['underhand'] = headers[fallbackIndex];
-                }
-            }
-        }
-        
-        // 서브(skill2)가 매칭되지 않았고, 맨 마지막 컬럼이 있으면 강제 할당
-        if (headerMapping['서브'] === -1 && totalHeaders >= expectedStatStartIndex + STAT_KEYS.length) {
-            const fallbackIndex = totalHeaders - 1; // 맨 마지막
-            if (fallbackIndex >= expectedStatStartIndex && fallbackIndex < totalHeaders) {
-                headerMapping['서브'] = fallbackIndex;
-                // fallback으로 할당된 경우에도 헤더 이름을 커스텀 라벨로 저장
-                if (headers[fallbackIndex]) {
-                    customLabels['serve'] = headers[fallbackIndex];
-                }
-            }
-        }
-        
-        // 모든 통계 항목의 헤더 이름을 커스텀 라벨로 저장
+
+        // 모든 통계 항목의 헤더 이름을 커스텀 라벨로 저장 (존재하는 경우만)
         STAT_KEYS.forEach((key, index) => {
             const headerKey = statHeaderKeys[index];
             const headerIndex = headerMapping[headerKey];
             if (headerIndex !== -1 && headerIndex < headers.length) {
-                // 실제 헤더 텍스트를 커스텀 라벨로 저장 (이미 fallback으로 저장된 경우 덮어쓰지 않음)
-                if (!customLabels[key] && headers[headerIndex]) {
+                if (headers[headerIndex]) {
                     customLabels[key] = headers[headerIndex];
                 }
             }
         });
         saveCustomLabels(customLabels);
         
-        // 헤더에서 라벨 추출 (데이터 객체에 직접 포함하기 위해)
-        const skill1Label = (headerMapping['언더핸드'] !== -1 && headers[headerMapping['언더핸드']]) 
-            ? headers[headerMapping['언더핸드']] 
-            : "언더핸드";
-        const skill2Label = (headerMapping['서브'] !== -1 && headers[headerMapping['서브']]) 
-            ? headers[headerMapping['서브']] 
-            : "서브";
+        // 동적 평가 라벨 (존재할 때만 데이터에 주입)
+        const skill1Label = (headerMapping['언더핸드'] !== -1 && headers[headerMapping['언더핸드']])
+            ? headers[headerMapping['언더핸드']]
+            : '';
+        const skill2Label = (headerMapping['서브'] !== -1 && headers[headerMapping['서브']])
+            ? headers[headerMapping['서브']]
+            : '';
         
         let players: Omit<Player, 'id' | 'anonymousName' | 'isCaptain' | 'totalScore'>[] = [];
 
@@ -229,9 +228,8 @@ const PlayerInputScreen: React.FC<PlayerInputScreenProps> = ({ onStart }) => {
                 class: studentClass,
                 studentNumber: studentNumber,
                 stats: stats as Stats,
-                // [핵심] 라벨을 데이터에 직접 심어버림 (데이터 문신)
-                customLabel1: skill1Label,
-                customLabel2: skill2Label,
+                ...(skill1Label ? { customLabel1: skill1Label } : {}),
+                ...(skill2Label ? { customLabel2: skill2Label } : {}),
             });
         }
         
@@ -305,6 +303,11 @@ const PlayerInputScreen: React.FC<PlayerInputScreenProps> = ({ onStart }) => {
                      <p className="text-xs sm:text-sm text-slate-400 mt-2 h-5">
                         {statusMessage}
                      </p>
+                     {dynamicEvalHeaders.length > 0 && (
+                        <p className="text-xs text-sky-300 mt-1">
+                            감지된 평가 항목: {dynamicEvalHeaders.join(', ')}
+                        </p>
+                     )}
                 </div>
                 
                 <form onSubmit={handleParseAndProceed}>

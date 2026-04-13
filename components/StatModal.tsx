@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect } from 'react';
-import { Player, STAT_KEYS } from '../types';
+import { Player } from '../types';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip, ResponsiveContainer } from 'recharts';
 import { useTranslation } from '../hooks/useTranslation';
 import { getStatLabel } from '../utils/labelUtils';
@@ -17,21 +17,27 @@ const StatModal: React.FC<StatModalProps> = ({ player, onClose, showRealNames, a
         document.body.style.overflow = 'hidden';
         return () => { document.body.style.overflow = ''; };
     }, []);
-    // 데이터 안에 있는 라벨을 꺼내 씀 (없으면 기본값)
-    const skill1Label = player.customLabel1 || "언더핸드";
-    const skill2Label = player.customLabel2 || "서브";
-    
-    // 필터링 제거: 무조건 6개 축을 하드코딩으로 박아넣음
+    // 시트 동기화: 동적 평가 항목(최대 2개)만 축에 포함
+    const hasSkill1 = Boolean(player.customLabel1) || player.stats.underhand > 0 || allPlayers.some(p => p.stats.underhand > 0);
+    const hasSkill2 = Boolean(player.customLabel2) || player.stats.serve > 0 || allPlayers.some(p => p.stats.serve > 0);
+    const skill1Label = player.customLabel1 || getStatLabel('underhand', t);
+    const skill2Label = player.customLabel2 || getStatLabel('serve', t);
+
     const chartData = useMemo(() => {
-        return [
+        const baseAxes = [
             { subject: getStatLabel('height', t), value: player.stats.height || 0, fullMark: 100 },
             { subject: getStatLabel('shuttleRun', t), value: player.stats.shuttleRun || 0, fullMark: 100 },
             { subject: getStatLabel('flexibility', t), value: player.stats.flexibility || 0, fullMark: 100 },
             { subject: getStatLabel('fiftyMeterDash', t), value: player.stats.fiftyMeterDash || 0, fullMark: 100 },
-            { subject: skill1Label, value: player.stats.underhand || 0, fullMark: 100 }, // 5번째 축
-            { subject: skill2Label, value: player.stats.serve || 0, fullMark: 100 }, // 6번째 축 (무조건 포함)
         ];
-    }, [player.stats, t, skill1Label, skill2Label]);
+        if (hasSkill1) {
+            baseAxes.push({ subject: skill1Label, value: player.stats.underhand || 0, fullMark: 100 });
+        }
+        if (hasSkill2) {
+            baseAxes.push({ subject: skill2Label, value: player.stats.serve || 0, fullMark: 100 });
+        }
+        return baseAxes;
+    }, [player.stats, t, skill1Label, skill2Label, hasSkill1, hasSkill2]);
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>

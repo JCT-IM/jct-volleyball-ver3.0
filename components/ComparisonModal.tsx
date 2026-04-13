@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect } from 'react';
-import { Player, STAT_KEYS } from '../types';
+import { Player } from '../types';
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Tooltip, ResponsiveContainer } from 'recharts';
 import { useTranslation } from '../hooks/useTranslation';
 import { getStatLabel } from '../utils/labelUtils';
@@ -24,16 +24,16 @@ const player2Color = "#fb923c"; // orange-400
 const ComparisonModal: React.FC<ComparisonModalProps> = ({ player1, player2, onClose, showRealNames, allPlayers = [] }) => {
     const { t } = useTranslation();
     
-    // 데이터 안에 있는 라벨을 꺼내 씀 (없으면 기본값)
-    // 두 선수 중 하나라도 라벨이 있으면 사용 (일반적으로 같은 반이므로 동일한 라벨을 가짐)
-    const skill1Label = player1.customLabel1 || player2.customLabel1 || "언더핸드";
-    const skill2Label = player1.customLabel2 || player2.customLabel2 || "서브";
-    
-    // 필터링 제거: 무조건 6개 축을 하드코딩으로 박아넣음
+    // 동적 평가 항목(최대 2개): 시트에서 살아있는 헤더만 축으로 사용
+    const hasSkill1 = Boolean(player1.customLabel1 || player2.customLabel1) || player1.stats.underhand > 0 || player2.stats.underhand > 0;
+    const hasSkill2 = Boolean(player1.customLabel2 || player2.customLabel2) || player1.stats.serve > 0 || player2.stats.serve > 0;
+    const skill1Label = player1.customLabel1 || player2.customLabel1 || getStatLabel('underhand', t);
+    const skill2Label = player1.customLabel2 || player2.customLabel2 || getStatLabel('serve', t);
+
     const chartData = useMemo((): ChartDataPoint[] => {
         if (!player1 || !player2) return [];
-        
-        return [
+
+        const baseAxes: ChartDataPoint[] = [
             { 
                 subject: getStatLabel('height', t), 
                 [player1.anonymousName]: player1.stats.height || 0, 
@@ -58,20 +58,27 @@ const ComparisonModal: React.FC<ComparisonModalProps> = ({ player1, player2, onC
                 [player2.anonymousName]: player2.stats.fiftyMeterDash || 0, 
                 fullMark: 100 
             },
-            { 
+        ];
+
+        if (hasSkill1) {
+            baseAxes.push({ 
                 subject: skill1Label, 
                 [player1.anonymousName]: player1.stats.underhand || 0, 
                 [player2.anonymousName]: player2.stats.underhand || 0, 
                 fullMark: 100 
-            }, // 5번째 축
-            { 
+            });
+        }
+        if (hasSkill2) {
+            baseAxes.push({ 
                 subject: skill2Label, 
                 [player1.anonymousName]: player1.stats.serve || 0, 
                 [player2.anonymousName]: player2.stats.serve || 0, 
                 fullMark: 100 
-            }, // 6번째 축 (무조건 포함)
-        ];
-    }, [player1, player2, t, skill1Label, skill2Label]);
+            });
+        }
+
+        return baseAxes;
+    }, [player1, player2, t, skill1Label, skill2Label, hasSkill1, hasSkill2]);
 
     useEffect(() => {
         if (player1 && player2) {
