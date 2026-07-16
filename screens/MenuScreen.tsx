@@ -32,6 +32,7 @@ interface MenuScreenProps {
     appMode?: 'CLASS' | 'CLUB';
     onStartLeagueLive?: (teamA: string, teamB: string) => void;
     onStartCompetition: () => void;
+    onStartScheduledBroadcast?: () => void;
     onShowHistory: (matchId?: string) => void;
     onShowPlayerRecords: () => void;
     onShowRoleRecord?: () => void;
@@ -79,6 +80,7 @@ const MenuScreen: React.FC<MenuScreenProps> = ({
     appMode = 'CLASS',
     onStartLeagueLive,
     onStartCompetition,
+    onStartScheduledBroadcast,
     onShowHistory,
     onShowPlayerRecords,
     onShowRoleRecord,
@@ -289,6 +291,14 @@ const MenuScreen: React.FC<MenuScreenProps> = ({
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
                             {!isClub && <MenuCard icon={<UserGroupIcon className="w-6 h-6 sm:w-8 sm:h-8" />} title={t('menu_team_builder_title')} description={t('menu_team_builder_desc')} onClick={onStartTeamBuilder} />}
                             {!isClub && <MenuCard icon={<RectangleGroupIcon className="w-6 h-6 sm:w-8 sm:h-8" />} title={t('competition_title')} description={t('menu_competition_desc')} onClick={onStartCompetition} />}
+                            {isClub && onStartScheduledBroadcast && (
+                                <MenuCard
+                                    icon={<span className="text-xl">📺</span>}
+                                    title="방송 예약"
+                                    description="미리 코드를 발급하고 시청자 대기·자동 연결"
+                                    onClick={onStartScheduledBroadcast}
+                                />
+                            )}
                             <MenuCard icon={<UsersIcon className="w-6 h-6 sm:w-8 sm:h-8" />} title={t('menu_team_management_title')} description={t('menu_team_management_desc')} onClick={onStartTeamManagement} />
                             <MenuCard icon={<span className="text-xl">📋</span>} title="전술판" description="자석과 펜으로 작전을 그리세요" onClick={() => setShowTacticalBoard(true)} />
                             {isClub && <MenuCard icon={<span className="text-xl">📊</span>} title="전력 분석 메모" description="상대 팀 전력 분석을 작성하고 공유하세요" onClick={() => setShowAnalysisMemo(true)} />}

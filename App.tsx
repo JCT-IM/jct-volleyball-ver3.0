@@ -30,12 +30,15 @@ import AdminLockScreen from './screens/AdminLockScreen';
 import StudentJoinScreen from './screens/StudentJoinScreen';
 import RoleRecordScreen from './screens/RoleRecordScreen';
 import { AssessmentRankingScreen } from './screens/AssessmentRankingScreen';
-import { Player, Screen, Stats, STAT_KEYS, MatchState, SavedTeamInfo, SavedOpponentTeam, MatchRoles } from './types';
+import ScheduledBroadcastScreen from './screens/ScheduledBroadcastScreen';
+import { Player, Screen, Stats, STAT_KEYS, MatchState, SavedTeamInfo, SavedOpponentTeam, MatchRoles, ScheduledBroadcast } from './types';
 import ConfirmationModal from './components/common/ConfirmationModal';
 import PasswordModal from './components/common/PasswordModal';
 import { useTranslation } from './hooks/useTranslation';
 import { isAdminPasswordCorrect } from './utils/adminPassword';
 import LockScreen, { UNLOCKED_MODE_KEY } from './components/LockScreen';
+import PracticeOptionsModal, { PracticeMatchOptions, DEFAULT_PRACTICE_OPTIONS } from './components/PracticeOptionsModal';
+import { buildSavedTeamInfo, rosterToPlayersRecord } from './utils/scheduledBroadcastRoster';
 
 type TournamentInfo = {
     tournamentId: string;
@@ -93,7 +96,7 @@ const getInitialPendingJoinCodeFromUrl = (): string | null => {
     return liveCode ? liveCode.trim().toUpperCase() : null;
 };
 
-type ViewKey = 'menu' | 'teamBuilder' | 'matchSetup' | 'attendance' | 'scoreboard' | 'history' | 'referee' | 'teamManagement' | 'teamAnalysis' | 'heatmapAnalysis' | 'achievements' | 'skillDrill' | 'playerRecords' | 'cheerSong' | 'settings' | 'tournament' | 'leagueLobby' | 'league' | 'announcer' | 'cameraDirector' | 'competition' | 'roleRecord' | 'assessmentRanking';
+type ViewKey = 'menu' | 'teamBuilder' | 'matchSetup' | 'attendance' | 'scoreboard' | 'history' | 'referee' | 'teamManagement' | 'teamAnalysis' | 'heatmapAnalysis' | 'achievements' | 'skillDrill' | 'playerRecords' | 'cheerSong' | 'settings' | 'tournament' | 'leagueLobby' | 'league' | 'announcer' | 'cameraDirector' | 'competition' | 'roleRecord' | 'assessmentRanking' | 'scheduledBroadcast';
 
 const VIEW_TO_SEGMENT: Record<ViewKey, string> = {
     menu: '',
@@ -119,6 +122,7 @@ const VIEW_TO_SEGMENT: Record<ViewKey, string> = {
     competition: 'competition',
     roleRecord: 'role-record',
     assessmentRanking: 'assessment-ranking',
+    scheduledBroadcast: 'scheduled-broadcast',
 };
 
 const SEGMENT_TO_VIEW: Record<string, ViewKey> = Object.fromEntries(
@@ -203,6 +207,9 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
     const [leagueInfoForMatch, setLeagueInfoForMatch] = useState<LeagueInfo | null>(null);
     const [selectedLeagueId, setSelectedLeagueId] = useState<string | null>(null);
     const [isNextMatchPractice, setIsNextMatchPractice] = useState(false);
+    const [showPracticeOptionsModal, setShowPracticeOptionsModal] = useState(false);
+    const [practiceMatchOptions, setPracticeMatchOptions] = useState<PracticeMatchOptions>(DEFAULT_PRACTICE_OPTIONS);
+    const [pendingFixedPin, setPendingFixedPin] = useState<string | null>(null);
     const { t } = useTranslation();
 
     // 전역 화면 잠금 (앱 어디서든 잠금 버튼 노출, 잠금 시 전체 오버레이)
@@ -334,6 +341,10 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
     }, []);
 
     const handleGoToAttendance = (teams: { teamA: string, teamB: string, teamAKey?: string, teamBKey?: string, teamBFromOpponent?: SavedOpponentTeam, isAssessmentMode?: boolean }, tournamentInfo?: TournamentInfo, leagueInfo?: LeagueInfo) => {
+        // 토너먼트/리그 대진에서 온 경우: 연습 경기 플래그가 남아 있어도 정식 경기로 취급
+        if (tournamentInfo || leagueInfo) {
+            setIsNextMatchPractice(false);
+        }
         setTeamsForAttendance(teams);
         setTournamentInfoForMatch(tournamentInfo || null);
         setLeagueInfoForMatch(leagueInfo || null);
@@ -355,35 +366,91 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
             teamBInfo: data.teamBInfo,
         };
         const isLeague = !!leagueInfoForMatch;
+        const isTournament = !!tournamentInfoForMatch;
+        // 토너먼트/리그 정식 경기는 연습 플래그와 무관하게 항상 정식 룰 적용
+        const isPracticeMatch = isNextMatchPractice && !isLeague && !isTournament;
+        if (!isPracticeMatch) {
+            setIsNextMatchPractice(false);
+        }
         const t = appMode === 'CLUB' ? await getTournamentSettingsForLive() : { tournamentMaxSets: 3, tournamentTargetScore: 21 };
+        const practiceOpts = isPracticeMatch ? practiceMatchOptions : null;
+        const practiceMaxSets = practiceOpts
+            ? (practiceOpts.decidingSetTo15 ? 3 : 1)
+            : undefined;
+        const practiceUnlimited = practiceOpts ? practiceOpts.unlimitedSets : undefined;
+        const practiceCourtChange = practiceOpts ? practiceOpts.courtChange : undefined;
         startMatch(sessionData, undefined, data.attendingPlayers, tournamentInfoForMatch || undefined, data.onCourtIds, leagueInfoForMatch || undefined, {
             onCourtOrder: data.onCourtOrder,
-            isPracticeMatch: isNextMatchPractice,
-            maxSets: appMode === 'CLUB' ? (isNextMatchPractice ? 1 : t.tournamentMaxSets) : (isLeague ? t.tournamentMaxSets : undefined),
+            isPracticeMatch,
+            maxSets: appMode === 'CLUB'
+                ? (isPracticeMatch ? (practiceMaxSets ?? 1) : t.tournamentMaxSets)
+                : (isLeague ? t.tournamentMaxSets : undefined),
             tournamentTargetScore: appMode === 'CLUB' ? t.tournamentTargetScore : (isLeague ? t.tournamentTargetScore : undefined),
             isLeagueMatch: isLeague,
             leagueStandingsId: leagueInfoForMatch?.leagueId ?? undefined,
             matchRoles: data.matchRoles ?? teamsForAttendance?.matchRoles,
             isAssessment: teamsForAttendance?.isAssessmentMode,
+            setsUnlimited: practiceUnlimited,
+            courtChangeEnabled: practiceCourtChange,
+            fixedPin: pendingFixedPin ?? undefined,
         });
+        setPendingFixedPin(null);
         setIsNextMatchPractice(false);
         setScoreboardMode('record');
         setView('scoreboard');
     };
     
     const handleStartRefereeMatch = (teams: { teamA: string, teamB: string, teamAKey?: string, teamBKey?: string }) => {
+        setIsNextMatchPractice(false);
         startMatch(teams);
         setScoreboardMode('referee');
         setView('scoreboard');
     };
     
     const handleContinueGame = (gameState: MatchState) => {
+        setIsNextMatchPractice(false);
         startMatch(undefined, gameState);
         setScoreboardMode('record');
         setView('scoreboard');
     };
 
+    /** 예약 방송: MatchSetup/Attendance 없이 바로 전광판 (라인업은 예약 스냅샷 또는 빈 명단) */
+    const handleStartScheduledBroadcast = async (item: Partial<ScheduledBroadcast> & { code: string }) => {
+        const code = item.code.trim().toUpperCase();
+        const homeName = item.homeTeamName?.trim() || '우리 팀';
+        const awayName = item.awayTeamName?.trim() || '상대 팀';
+        const teamAPlayers = rosterToPlayersRecord(item.homePlayers, 'home');
+        const teamBPlayers = rosterToPlayersRecord(item.awayPlayers, 'away');
+        const teamAInfo = buildSavedTeamInfo(homeName, teamAPlayers);
+        const teamBInfo = buildSavedTeamInfo(awayName, teamBPlayers);
+        const tSettings = await getTournamentSettingsForLive();
+        setIsNextMatchPractice(false);
+        setPendingFixedPin(null);
+        setEntryMode('club');
+        startMatch(
+            { teamA: homeName, teamB: awayName, teamAInfo, teamBInfo },
+            undefined,
+            { teamA: teamAPlayers, teamB: teamBPlayers },
+            undefined,
+            {
+                teamA: new Set(Object.keys(teamAPlayers)),
+                teamB: new Set(Object.keys(teamBPlayers)),
+            },
+            undefined,
+            {
+                isPracticeMatch: false,
+                maxSets: tSettings.tournamentMaxSets,
+                tournamentTargetScore: tSettings.tournamentTargetScore,
+                courtChangeEnabled: true,
+                fixedPin: code,
+            }
+        );
+        setScoreboardMode('record');
+        setView('scoreboard');
+    };
+
     const handleStartTournamentMatch = (data: { teamAKey: string, teamBKey: string, teamAName: string, teamBName: string, tournamentId: string, tournamentMatchId: string }) => {
+        setIsNextMatchPractice(false);
         handleGoToAttendance(
             { teamA: data.teamAName, teamB: data.teamBName, teamAKey: data.teamAKey, teamBKey: data.teamBKey },
             { tournamentId: data.tournamentId, tournamentMatchId: data.tournamentMatchId }
@@ -391,6 +458,7 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
     };
 
     const handleStartLeagueMatch = (data: { teamAKey: string, teamBKey: string, teamAName: string, teamBName: string, leagueId: string, leagueMatchId: string }) => {
+        setIsNextMatchPractice(false);
         handleGoToAttendance(
             { teamA: data.teamAName, teamB: data.teamBName, teamAKey: data.teamAKey, teamBKey: data.teamBKey },
             undefined,
@@ -404,6 +472,8 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
         setTournamentInfoForMatch(null);
         setLeagueInfoForMatch(null);
         setSelectedLeagueId(null);
+        setIsNextMatchPractice(false);
+        setPendingFixedPin(null);
         closeSession();
         setView('menu');
     }
@@ -469,6 +539,12 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
                         onSelectLeague={() => setView('leagueLobby')}
                     />
                 );
+            case 'scheduledBroadcast':
+                return (
+                    <ScheduledBroadcastScreen
+                        onStartBroadcast={handleStartScheduledBroadcast}
+                    />
+                );
             case 'tournament':
                 return <TournamentScreen onStartMatch={handleStartTournamentMatch} onOpenMatchAnalysis={(matchId) => { setPreselectedMatchId(matchId); setView('history'); }} />;
             case 'league':
@@ -511,7 +587,10 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
                         }}
                         onStartMatch={() => {
                             const mode = appMode === 'CLASS' ? 'class' : 'club';
-                            if (appMode === 'CLUB') setIsNextMatchPractice(true);
+                            if (appMode === 'CLUB') {
+                                setShowPracticeOptionsModal(true);
+                                return;
+                            }
                             setEntryMode(mode);
                             if (typeof window !== 'undefined') {
                                 const params = new URLSearchParams(window.location.search);
@@ -533,6 +612,7 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
                         }}
                         appMode={appMode}
                         onStartCompetition={() => setView('competition')}
+                        onStartScheduledBroadcast={appMode === 'CLUB' ? () => setView('scheduledBroadcast') : undefined}
                         onShowHistory={(matchId?: string) => {
                             if (matchId) {
                                 setPreselectedMatchId(matchId);
@@ -579,6 +659,7 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
             case 'cheerSong': return 'cheer_song_title';
             case 'settings': return 'settings_title';
             case 'competition': return 'competition_title';
+            case 'scheduledBroadcast': return 'scheduled_broadcast_title';
             case 'tournament': return 'tournament_title';
             case 'leagueLobby': return 'league_title';
             case 'league': return 'league_title';
@@ -681,6 +762,22 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
                 isOpen={isPasswordModalOpen}
                 onSuccess={handlePasswordSuccess}
                 onClose={handlePasswordCancel}
+            />
+            <PracticeOptionsModal
+                isOpen={showPracticeOptionsModal}
+                onCancel={() => setShowPracticeOptionsModal(false)}
+                onConfirm={(opts) => {
+                    setPracticeMatchOptions(opts);
+                    setIsNextMatchPractice(true);
+                    setShowPracticeOptionsModal(false);
+                    setEntryMode('club');
+                    if (typeof window !== 'undefined') {
+                        const params = new URLSearchParams(window.location.search);
+                        params.set('mode', 'club');
+                        window.history.replaceState(null, '', `${window.location.pathname || '/'}?${params.toString()}`);
+                    }
+                    setView('matchSetup');
+                }}
             />
         </div>
     );

@@ -236,6 +236,10 @@ export interface MatchState {
     leagueMatchId?: string;
     /** 연습경기(practice) / 대회·조별리그(tournament) 구분 */
     matchType?: 'practice' | 'tournament';
+    /** 연습 경기: true면 세트 종료 후에도 gameOver 없이 다음 세트 진행 가능. false/미설정+practice면 matchType만으로 판정하던 구버전 호환은 DataContext에서 처리 */
+    setsUnlimited?: boolean;
+    /** 코트 체인지(세트 종료 좌우 스왑 + 결승 세트 8점 스왑) 활성 여부. 미설정 시 CLUB은 기존처럼 활성으로 취급 */
+    courtChangeEnabled?: boolean;
     time?: number;
     undoStack?: MatchState[]; // For Undo functionality
     /** 세트 종료 후 [다음 세트 진행] 대기 중일 때 true (코트 체인지 후 다음 세트 시작용) */
@@ -367,6 +371,35 @@ export interface LeagueMatch {
     teamBName: string;
     matchId: string | null; // To link with a MatchState in matchHistory
     day?: number;
+}
+
+/** CLUB 방송 예약 (MatchState와 분리) */
+export type ScheduledBroadcastStatus = 'scheduled' | 'live' | 'ended' | 'cancelled';
+
+/** 예약에 저장하는 간단한 선수 스냅샷 */
+export interface ScheduledRosterPlayer {
+    id?: string;
+    name: string;
+    number?: string;
+}
+
+export interface ScheduledBroadcast {
+    id: string;
+    code: string;
+    title: string;
+    description: string;
+    createdAt: string;
+    status: ScheduledBroadcastStatus;
+    startedAt?: string;
+    endedAt?: string;
+    /** 우리 학교 팀명 */
+    homeTeamName?: string;
+    /** 우리 학교 선수 명단 (예약 시 미리 입력) */
+    homePlayers?: ScheduledRosterPlayer[];
+    /** 상대 팀명 (선택) */
+    awayTeamName?: string;
+    /** 상대 선수 명단 (선택, 비워둘 수 있음) */
+    awayPlayers?: ScheduledRosterPlayer[];
 }
 
 
@@ -541,6 +574,21 @@ export interface DataContextType {
     saveLeagueStandingsList: (data: LeagueStandingsDataList) => Promise<void>;
     practiceMatchHistory: any[];
     leagueMatchHistory: (MatchState & { date: string; time?: number })[];
+    scheduledBroadcasts: ScheduledBroadcast[];
+    createScheduledBroadcast: (
+        title: string,
+        description: string,
+        roster?: {
+            homeTeamName?: string;
+            homePlayers?: ScheduledRosterPlayer[];
+            awayTeamName?: string;
+            awayPlayers?: ScheduledRosterPlayer[];
+        }
+    ) => Promise<ScheduledBroadcast>;
+    updateScheduledBroadcast: (id: string, patch: Partial<ScheduledBroadcast>) => Promise<void>;
+    cancelScheduledBroadcast: (id: string) => Promise<void>;
+    markScheduledBroadcastLive: (code: string) => Promise<void>;
+    markScheduledBroadcastEnded: (code: string) => Promise<void>;
     saveOpponentTeam: (team: Omit<SavedOpponentTeam, 'id' | 'savedAt'>) => Promise<void>;
     updateOpponentTeam: (id: string, team: Partial<SavedOpponentTeam>) => Promise<void>;
     deleteOpponentTeam: (id: string) => Promise<void>;
@@ -592,7 +640,19 @@ export interface DataContextType {
         tournamentInfo?: { tournamentId: string; tournamentMatchId: string },
         onCourtIds?: { teamA: Set<string>; teamB: Set<string> },
         leagueInfo?: { leagueId: string, leagueMatchId: string },
-        options?: { isPracticeMatch?: boolean; maxSets?: number; tournamentTargetScore?: number; isLeagueMatch?: boolean; leagueStandingsId?: string | null; onCourtOrder?: { teamA: string[]; teamB: string[] }; matchRoles?: MatchRoles }
+        options?: {
+            isPracticeMatch?: boolean;
+            maxSets?: number;
+            tournamentTargetScore?: number;
+            isLeagueMatch?: boolean;
+            leagueStandingsId?: string | null;
+            onCourtOrder?: { teamA: string[]; teamB: string[] };
+            matchRoles?: MatchRoles;
+            isAssessment?: boolean;
+            setsUnlimited?: boolean;
+            courtChangeEnabled?: boolean;
+            fixedPin?: string;
+        }
     ) => void;
     recoveryData: any | null;
     handleRestoreFromBackup: () => void;
@@ -632,8 +692,8 @@ export interface DataContextType {
     receivedEffects: { id: number; effectType: 'SPIKE' | 'BLOCK' }[];
     addReceivedEffect: (effectType: 'SPIKE' | 'BLOCK') => void;
     removeReceivedEffect: (id: number) => void;
-    startHostSession: (initialState?: MatchState) => void;
-    joinSession: (peerId: string, onSuccess: () => void) => void;
+    startHostSession: (initialState?: MatchState, fixedPin?: string) => void;
+    joinSession: (peerId: string, onSuccess: () => void, options?: { silent?: boolean }) => void;
     closeSession: () => void;
     language: Language;
     setLanguage: (lang: Language) => void;

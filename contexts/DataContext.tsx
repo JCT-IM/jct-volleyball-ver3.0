@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode, useCallback, useReducer, useRef, PropsWithChildren, useMemo } from 'react';
 import Peer from 'peerjs';
-import { MatchState, TeamSet, TeamMatchState, Player, PlayerStats, Action, UserEmblem, SavedTeamInfo, SavedOpponentTeam, LeagueStandingsData, LeagueStandingsDataList, LeagueStandingsMatch, ScoreEvent, PlayerAchievements, PlayerCumulativeStats, ToastState, AppSettings, Tournament, League, PlayerCoachingLogs, CoachingLog, TeamStats, DataContextType, Badge, P2PState, DataConnection, P2PMessage, Language, ScoreEventType, MatchRoles } from '../types';
+import { MatchState, TeamSet, TeamMatchState, Player, PlayerStats, Action, UserEmblem, SavedTeamInfo, SavedOpponentTeam, LeagueStandingsData, LeagueStandingsDataList, LeagueStandingsMatch, ScoreEvent, PlayerAchievements, PlayerCumulativeStats, ToastState, AppSettings, Tournament, League, PlayerCoachingLogs, CoachingLog, TeamStats, DataContextType, Badge, P2PState, DataConnection, P2PMessage, Language, ScoreEventType, MatchRoles, ScheduledBroadcast } from '../types';
 import { BADGE_DEFINITIONS } from '../data/badges';
 import { translations } from '../data/translations';
 import localforage from 'localforage';
@@ -40,6 +40,7 @@ function getStorageKeys(appMode: 'CLASS' | 'CLUB') {
         LEAGUE_STANDINGS_LIST_KEY: p + 'jct_volleyball_league_standings_list',
         PRACTICE_MATCH_HISTORY_KEY: p + 'jct_volleyball_practice_match_history',
         LEAGUE_MATCH_HISTORY_KEY: p + 'jct_volleyball_league_match_history',
+        SCHEDULED_BROADCASTS_KEY: p + 'jct_volleyball_scheduled_matches',
     };
 }
 const TEAM_COLORS_PALETTE = ['#3b82f6', '#ef4444', '#22c55e', '#eab308', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b', '#f472b6', '#06b6d4', '#f59e0b'];
@@ -156,7 +157,11 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
     const isLeagueMatchRef = useRef(false);
     const leagueStandingsIdRef = useRef<string | null>(null);
     const matchRolesRef = useRef<MatchRoles | null>(null);
+    const [scheduledBroadcasts, setScheduledBroadcasts] = useState<ScheduledBroadcast[]>([]);
+    const scheduledBroadcastsRef = useRef<ScheduledBroadcast[]>([]);
+    const activeScheduledCodeRef = useRef<string | null>(null);
     useEffect(() => { practiceMatchHistoryRef.current = practiceMatchHistory; }, [practiceMatchHistory]);
+    useEffect(() => { scheduledBroadcastsRef.current = scheduledBroadcasts; }, [scheduledBroadcasts]);
     const [isLoading, setIsLoading] = useState(true);
     const [toast, setToast] = useState<ToastState>({ message: '', type: 'success' });
     const [recoveryData, setRecoveryData] = useState<any | null>(null);
@@ -377,6 +382,78 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
         }
     };
 
+    const persistScheduledBroadcasts = useCallback(async (list: ScheduledBroadcast[]) => {
+        setScheduledBroadcasts(list);
+        scheduledBroadcastsRef.current = list;
+        if (appMode === 'CLUB') {
+            await localforage.setItem(storageKeys.SCHEDULED_BROADCASTS_KEY, list);
+        }
+    }, [appMode, storageKeys.SCHEDULED_BROADCASTS_KEY]);
+
+    const createScheduledBroadcast = useCallback(async (
+        title: string,
+        description: string,
+        roster?: {
+            homeTeamName?: string;
+            homePlayers?: ScheduledBroadcast['homePlayers'];
+            awayTeamName?: string;
+            awayPlayers?: ScheduledBroadcast['awayPlayers'];
+        }
+    ): Promise<ScheduledBroadcast> => {
+        const code = generatePin();
+        const item: ScheduledBroadcast = {
+            id: `sb-${Date.now()}-${code}`,
+            code,
+            title: title.trim(),
+            description: description.trim(),
+            createdAt: new Date().toISOString(),
+            status: 'scheduled',
+            homeTeamName: roster?.homeTeamName?.trim() || undefined,
+            homePlayers: roster?.homePlayers?.length ? roster.homePlayers : undefined,
+            awayTeamName: roster?.awayTeamName?.trim() || undefined,
+            awayPlayers: roster?.awayPlayers?.length ? roster.awayPlayers : undefined,
+        };
+        const next = [item, ...scheduledBroadcastsRef.current];
+        await persistScheduledBroadcasts(next);
+        showToast(`방송 예약 완료. 코드: ${code}`, 'success');
+        return item;
+    }, [persistScheduledBroadcasts, showToast]);
+
+    const updateScheduledBroadcast = useCallback(async (id: string, patch: Partial<ScheduledBroadcast>) => {
+        const next = scheduledBroadcastsRef.current.map(s => s.id === id ? { ...s, ...patch } : s);
+        await persistScheduledBroadcasts(next);
+    }, [persistScheduledBroadcasts]);
+
+    const cancelScheduledBroadcast = useCallback(async (id: string) => {
+        const next = scheduledBroadcastsRef.current.map(s =>
+            s.id === id ? { ...s, status: 'cancelled' as const } : s
+        );
+        await persistScheduledBroadcasts(next);
+        showToast('예약이 취소되었습니다.', 'success');
+    }, [persistScheduledBroadcasts, showToast]);
+
+    const markScheduledBroadcastLive = useCallback(async (code: string) => {
+        const c = code.trim().toUpperCase();
+        const next = scheduledBroadcastsRef.current.map(s =>
+            s.code === c && (s.status === 'scheduled' || s.status === 'live')
+                ? { ...s, status: 'live' as const, startedAt: s.startedAt ?? new Date().toISOString() }
+                : s
+        );
+        await persistScheduledBroadcasts(next);
+        activeScheduledCodeRef.current = c;
+    }, [persistScheduledBroadcasts]);
+
+    const markScheduledBroadcastEnded = useCallback(async (code: string) => {
+        const c = code.trim().toUpperCase();
+        const next = scheduledBroadcastsRef.current.map(s =>
+            s.code === c && s.status === 'live'
+                ? { ...s, status: 'ended' as const, endedAt: new Date().toISOString() }
+                : s
+        );
+        await persistScheduledBroadcasts(next);
+        if (activeScheduledCodeRef.current === c) activeScheduledCodeRef.current = null;
+    }, [persistScheduledBroadcasts]);
+
     /** 리그 라이브 전광판 시작 시 저장소에서 대회 룰을 읽어옵니다. 키 없거나 NaN 방지를 위해 숫자 파싱·폴백 적용 */
     const getTournamentSettingsForLive = useCallback(async (): Promise<{ tournamentTargetScore: number; tournamentMaxSets: number }> => {
         try {
@@ -400,7 +477,7 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
         teamBPlayers: Record<string, Player>;
         teamADetails?: Partial<TeamMatchState>;
         teamBDetails?: Partial<TeamMatchState>;
-    }, tournamentInfo?: { tournamentId: string, tournamentMatchId: string }, onCourtIds?: { teamA: Set<string>, teamB: Set<string> }, leagueInfo?: { leagueId: string, leagueMatchId: string }, options?: { maxSets?: number; tournamentTargetScore?: number; onCourtOrder?: { teamA: string[]; teamB: string[] }; isAssessment?: boolean; matchType?: 'practice' | 'tournament' }): MatchState => {
+    }, tournamentInfo?: { tournamentId: string, tournamentMatchId: string }, onCourtIds?: { teamA: Set<string>, teamB: Set<string> }, leagueInfo?: { leagueId: string, leagueMatchId: string }, options?: { maxSets?: number; tournamentTargetScore?: number; onCourtOrder?: { teamA: string[]; teamB: string[] }; isAssessment?: boolean; matchType?: 'practice' | 'tournament'; setsUnlimited?: boolean; courtChangeEnabled?: boolean }): MatchState => {
         const initPlayerStats = (players: Record<string, Player>): Record<string, PlayerStats> =>
             Object.keys(players).reduce((acc, playerId) => {
                 acc[playerId] = { 
@@ -447,6 +524,8 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
             undoStack: [],
             ...(options?.isAssessment === true && { isAssessment: true }),
             ...(options?.matchType && { matchType: options.matchType }),
+            ...(options?.setsUnlimited !== undefined && { setsUnlimited: options.setsUnlimited }),
+            ...(options?.courtChangeEnabled !== undefined && { courtChangeEnabled: options.courtChangeEnabled }),
             ...tournamentInfo,
             ...leagueInfo
         };
@@ -886,7 +965,9 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                     newState.setScores = [...setScoresList, { teamA: teamA.score, teamB: teamB.score }];
                     const winnerSetsWon = newState[winner === 'A' ? 'teamA' : 'teamB'].setsWon;
                     newState.lastServingTeamAtSetEnd = newState.servingTeam ?? undefined;
-                    const isPracticeUnlimited = appMode === 'CLUB' && newState.matchType === 'practice';
+                    const isPracticeUnlimited = appMode === 'CLUB'
+                        && newState.matchType === 'practice'
+                        && newState.setsUnlimited !== false;
                     if (isPracticeUnlimited) {
                         newEventDescription = `${newState.currentSet}세트 종료 (${winnerName} 팀 ${teamA.score}:${teamB.score}). 다음 세트 또는 결과 저장을 선택하세요.`;
                         newEventType = 'GAME_END';
@@ -1472,6 +1553,10 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
     };
 
     const saveMatchHistory = async (newHistory: (MatchState & { date: string; time?: number })[], successMessage?: string) => {
+        const finishScheduledIfAny = async () => {
+            const code = activeScheduledCodeRef.current;
+            if (code) await markScheduledBroadcastEnded(code);
+        };
         if (isPracticeMatchRef.current) {
             try {
                 const raw = newHistory[0];
@@ -1486,6 +1571,7 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                 await localforage.setItem(storageKeys.PRACTICE_MATCH_HISTORY_KEY, next);
                 setPracticeMatchHistory(next);
                 if (successMessage) showToast(successMessage, 'success');
+                await finishScheduledIfAny();
             } catch (e) {
                 console.error("Error saving practice match:", e);
                 showToast("연습 경기 저장 중 오류가 발생했습니다.", 'error');
@@ -1521,6 +1607,7 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                     await saveLeagueStandingsList({ list, selectedId: leagueStandingsList?.selectedId ?? null });
                 }
                 if (successMessage) showToast(successMessage, 'success');
+                await finishScheduledIfAny();
             } catch (e) {
                 console.error("Error saving league match:", e);
                 showToast("리그 경기 저장 중 오류가 발생했습니다.", 'error');
@@ -1536,6 +1623,7 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                 showToast(successMessage, 'success');
             }
             await createBackup();
+            await finishScheduledIfAny();
 
             const lastMatch = newHistory.find(m => m.status === 'completed');
             if (lastMatch) {
@@ -2132,7 +2220,8 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                 parsedLeagueStandings,
                 parsedLeagueStandingsList,
                 parsedPracticeMatchHistory,
-                parsedLeagueMatchHistory
+                parsedLeagueMatchHistory,
+                parsedScheduledBroadcasts
             ] = await Promise.all([
                 localforage.getItem(storageKeys.TEAM_SETS_KEY) as Promise<TeamSet[] | null>,
                 localforage.getItem(storageKeys.MATCH_HISTORY_KEY) as Promise<(MatchState & { date: string; time?: number })[] | null>,
@@ -2147,7 +2236,10 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                 localforage.getItem(storageKeys.LEAGUE_STANDINGS_KEY) as Promise<LeagueStandingsData | null>,
                 localforage.getItem(storageKeys.LEAGUE_STANDINGS_LIST_KEY) as Promise<LeagueStandingsDataList | null>,
                 localforage.getItem(storageKeys.PRACTICE_MATCH_HISTORY_KEY) as Promise<(MatchState & { date: string; time?: number })[] | null>,
-                localforage.getItem(storageKeys.LEAGUE_MATCH_HISTORY_KEY) as Promise<(MatchState & { date: string; time?: number })[] | null>
+                localforage.getItem(storageKeys.LEAGUE_MATCH_HISTORY_KEY) as Promise<(MatchState & { date: string; time?: number })[] | null>,
+                appMode === 'CLUB'
+                    ? (localforage.getItem(storageKeys.SCHEDULED_BROADCASTS_KEY) as Promise<ScheduledBroadcast[] | null>)
+                    : Promise.resolve(null)
             ]);
 
             const teamSets = parsedTeamSets || [];
@@ -2210,6 +2302,13 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
             }
             if (Array.isArray(parsedLeagueMatchHistory) && parsedLeagueMatchHistory.every(m => m && typeof m.date === 'string' && isValidMatchState(m))) {
                 setLeagueMatchHistory(parsedLeagueMatchHistory.map(ensureHistoryFields));
+            }
+            if (Array.isArray(parsedScheduledBroadcasts)) {
+                setScheduledBroadcasts(parsedScheduledBroadcasts);
+                scheduledBroadcastsRef.current = parsedScheduledBroadcasts;
+            } else {
+                setScheduledBroadcasts([]);
+                scheduledBroadcastsRef.current = [];
             }
             if (parsedLeagueStandingsList && Array.isArray(parsedLeagueStandingsList.list)) {
                 setLeagueStandingsList({ list: parsedLeagueStandingsList.list, selectedId: parsedLeagueStandingsList.selectedId ?? null });
@@ -2290,12 +2389,12 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
         setTimeout(() => { isIntentionallyClosing.current = false; }, 500);
     }, []);
 
-    const startHostSession = useCallback((initialState?: MatchState) => {
+    const startHostSession = useCallback((initialState?: MatchState, fixedPin?: string) => {
         if (peerRef.current) {
             peerRef.current.destroy();
         }
         latestMatchStateRef.current = initialState ?? matchState ?? null;
-        const pin = generatePin();
+        const pin = (fixedPin?.trim().toUpperCase() || generatePin()).slice(0, 4);
         const peerId = P2P_PIN_PREFIX + pin;
         setP2p(prev => ({ ...prev, status: 'connecting', isHost: true, isConnected: false, peerId: null, connections: [] }));
         connRef.current = [];
@@ -2310,7 +2409,7 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
         peerRef.current = newPeer;
 
         newPeer.on('open', () => {
-            setP2p(prev => ({ ...prev, peerId, status: 'connected', isConnected: true, viewerCount: 0 }));
+            setP2p(prev => ({ ...prev, peerId, status: 'connected', isHost: true, isConnected: true, viewerCount: 0 }));
             showToast(`실시간 세션이 시작되었습니다. 참여 코드: ${pin}`, 'success');
         });
 
@@ -2388,8 +2487,15 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
         latestMatchStateRef.current = matchState;
     }, [matchState]);
 
-    const joinSession = useCallback((pinOrId: string, onSuccess: () => void) => {
+    useEffect(() => {
+        if (matchState?.gameOver && activeScheduledCodeRef.current) {
+            void markScheduledBroadcastEnded(activeScheduledCodeRef.current);
+        }
+    }, [matchState?.gameOver, markScheduledBroadcastEnded]);
+
+    const joinSession = useCallback((pinOrId: string, onSuccess: () => void, options?: { silent?: boolean }) => {
         if (peerRef.current) peerRef.current.destroy();
+        const silent = !!options?.silent;
         
         const hostPeerId = toHostPeerId(pinOrId);
         setP2p({ peerId: null, isHost: false, isConnected: false, connections: [], status: 'connecting', error: undefined });
@@ -2403,7 +2509,7 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
         });
         peerRef.current = newPeer;
 
-        const JOIN_TIMEOUT_MS = 6000;
+        const JOIN_TIMEOUT_MS = silent ? 4000 : 6000;
         const timeoutMessage = '연결 시간 초과. 코드를 다시 확인해 주세요.';
 
         newPeer.on('open', () => {
@@ -2417,7 +2523,7 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                 peerRef.current = null;
                 connRef.current = [];
                 setP2p(prev => ({ ...prev, status: 'error', error: timeoutMessage, isConnected: false }));
-                showToast(timeoutMessage, 'error');
+                if (!silent) showToast(timeoutMessage, 'error');
             }, JOIN_TIMEOUT_MS);
 
             conn.on('open', () => {
@@ -2425,7 +2531,7 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                     clearTimeout(timeoutId);
                     timeoutId = null;
                 }
-                showToast('호스트에 연결되었습니다.', 'success');
+                if (!silent) showToast('호스트에 연결되었습니다.', 'success');
                 setP2p(prev => ({ ...prev, peerId: newPeer.id, isConnected: true, status: 'connected', connections: [conn] }));
                 onSuccess();
             });
@@ -2483,7 +2589,7 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                         clearTimeout(timeoutId);
                         timeoutId = null;
                     }
-                    showToast('호스트와의 연결이 끊어졌습니다.', 'error');
+                    if (!silent) showToast('호스트와의 연결이 끊어졌습니다.', 'error');
                     dispatch({type: 'RESET_STATE'});
                     closeSession();
                 }
@@ -2496,7 +2602,7 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                 console.error("PeerJS connection error:", err);
                 const message = `연결 오류: ${err.type}`;
                 setP2p(prev => ({ ...prev, status: 'error', error: message, isConnected: false }));
-                showToast(message, 'error');
+                if (!silent) showToast(message, 'error');
                 peerRef.current?.destroy();
                 peerRef.current = null;
                 connRef.current = [];
@@ -2507,7 +2613,7 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
             console.error("PeerJS client error:", err);
             const message = err.type === 'peer-unavailable' ? '호스트에 연결할 수 없습니다. 코드를 확인하세요.' : `연결 오류: ${err.type}`;
             setP2p(prev => ({ ...prev, status: 'error', error: message, isConnected: false }));
-            showToast(message, 'error');
+            if (!silent) showToast(message, 'error');
             peerRef.current?.destroy();
             peerRef.current = null;
             connRef.current = [];
@@ -2522,12 +2628,17 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
         tournamentInfo?: { tournamentId: string; tournamentMatchId: string },
         onCourtIds?: { teamA: Set<string>; teamB: Set<string> },
         leagueInfo?: { leagueId: string, leagueMatchId: string },
-        options?: { isPracticeMatch?: boolean; maxSets?: number; tournamentTargetScore?: number; isLeagueMatch?: boolean; leagueStandingsId?: string | null; onCourtOrder?: { teamA: string[]; teamB: string[] }; matchRoles?: MatchRoles; isAssessment?: boolean }
+        options?: { isPracticeMatch?: boolean; maxSets?: number; tournamentTargetScore?: number; isLeagueMatch?: boolean; leagueStandingsId?: string | null; onCourtOrder?: { teamA: string[]; teamB: string[] }; matchRoles?: MatchRoles; isAssessment?: boolean; setsUnlimited?: boolean; courtChangeEnabled?: boolean; fixedPin?: string }
     ) => {
         matchRolesRef.current = options?.matchRoles ?? null;
         isPracticeMatchRef.current = options?.isPracticeMatch ?? false;
         isLeagueMatchRef.current = options?.isLeagueMatch ?? false;
         leagueStandingsIdRef.current = options?.leagueStandingsId ?? null;
+        const fixedPin = options?.fixedPin?.trim().toUpperCase() || undefined;
+        if (fixedPin) {
+            activeScheduledCodeRef.current = fixedPin;
+            void markScheduledBroadcastLive(fixedPin);
+        }
         let stateToLoad: MatchState | null = null;
 
         if (existingState) {
@@ -2600,20 +2711,22 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                 onCourtOrder: options?.onCourtOrder,
                 isAssessment: options?.isAssessment,
                 matchType: options?.isPracticeMatch ? 'practice' : (options?.isLeagueMatch ? 'tournament' : undefined),
+                setsUnlimited: options?.setsUnlimited,
+                courtChangeEnabled: options?.courtChangeEnabled,
             });
         }
 
         if (stateToLoad) {
             dispatch({ type: 'LOAD_STATE', state: stateToLoad });
             if (!existingState) {
-                 startHostSession(stateToLoad);
+                 startHostSession(stateToLoad, fixedPin);
             }
         }
         
         setMatchTime(0);
         setTimerOn(!!stateToLoad?.servingTeam && !stateToLoad?.gameOver);
 
-    }, [getInitialState, teamSetsMap, startHostSession]);
+    }, [getInitialState, teamSetsMap, startHostSession, markScheduledBroadcastLive]);
     
     const localDispatch = useCallback((action: Action) => {
         const newState = matchReducer(matchState, action);
@@ -2775,6 +2888,12 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
         saveLeagueStandingsList,
         practiceMatchHistory,
         leagueMatchHistory,
+        scheduledBroadcasts,
+        createScheduledBroadcast,
+        updateScheduledBroadcast,
+        cancelScheduledBroadcast,
+        markScheduledBroadcastLive,
+        markScheduledBroadcastEnded,
         playerCumulativeStats,
         teamPerformanceData,
         tournaments,

@@ -13,6 +13,8 @@ interface TeamSelectionModalProps {
     onSelect: (teamKey: string) => void;
     excludeKey: string;
     baseTeamKey?: string;
+    /** 다른 모달(z-[200]) 위에 띄울 때 예: z-[250]. 기본은 일반 모달 규칙 z-[100] */
+    overlayZIndexClass?: string;
 }
 
 interface FlattenedTeam extends SavedTeamInfo {
@@ -23,7 +25,7 @@ interface FlattenedTeam extends SavedTeamInfo {
     savedAt: string;
 }
 
-const TeamSelectionModal: React.FC<TeamSelectionModalProps> = ({ isOpen, onClose, onSelect, excludeKey, baseTeamKey }) => {
+const TeamSelectionModal: React.FC<TeamSelectionModalProps> = ({ isOpen, onClose, onSelect, excludeKey, baseTeamKey, overlayZIndexClass = 'z-[100]' }) => {
     const { teamSets } = useData();
     const { t } = useTranslation();
     const [selectedClass, setSelectedClass] = useState<string>('');
@@ -110,7 +112,7 @@ const TeamSelectionModal: React.FC<TeamSelectionModalProps> = ({ isOpen, onClose
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+        <div className={`fixed inset-0 ${overlayZIndexClass} flex items-center justify-center bg-black/60 p-4`} onClick={onClose}>
             <div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto flex flex-col bg-slate-900/95 rounded-xl p-4 sm:p-6 lg:p-8" onClick={e => e.stopPropagation()}>
                 <div className="flex-shrink-0 flex justify-between items-center mb-6">
                     <h2 className="text-3xl font-bold text-sky-400">{t('team_selection')}</h2>

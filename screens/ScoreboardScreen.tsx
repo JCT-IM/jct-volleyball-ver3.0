@@ -143,6 +143,7 @@ import confetti from 'canvas-confetti';
 import { isAdminPasswordCorrect } from '../utils/adminPassword';
 import { formatJerseyLabel } from '../utils/formatJerseyNumber';
 import { AnalysisMemoModal, AnalysisMemoFocusTarget } from '../components/AnalysisMemoModal';
+import BroadcastLineupModal from '../components/BroadcastLineupModal';
 
 const CLUB_DEFENSE_FAULT_QUICK_CHIPS = ['준비 안 함', '집중력 저하', '콜 미스', '판단 미스'] as const;
 
@@ -283,7 +284,8 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
     useEffect(() => {
         const maxSetsCurrent = matchState?.maxSets ?? 1;
         const isDecidingSet = maxSetsCurrent >= 2 && matchState?.currentSet === maxSetsCurrent;
-        if (entryMode !== 'club' || !matchState || matchState.gameOver || !isDecidingSet) return;
+        const courtChangeOn = matchState?.courtChangeEnabled !== false;
+        if (entryMode !== 'club' || !matchState || matchState.gameOver || !isDecidingSet || !courtChangeOn) return;
         const { teamA, teamB } = matchState;
         const total = teamA.score + teamB.score;
         if (total >= 8 && (teamA.score >= 8 || teamB.score >= 8) && !courtChangeAt8DoneRef.current) {
@@ -291,7 +293,7 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
             showToast('🔄 코트 체인지 (결승 세트 8점)', 'success');
             setIsSwapped(prev => !prev);
         }
-    }, [matchState?.teamA.score, matchState?.teamB.score, matchState?.currentSet, matchState?.maxSets, matchState?.gameOver, entryMode, showToast]);
+    }, [matchState?.teamA.score, matchState?.teamB.score, matchState?.currentSet, matchState?.maxSets, matchState?.gameOver, matchState?.courtChangeEnabled, entryMode, showToast]);
 
     const handleTournamentModeToggle = (nextChecked: boolean) => {
         if (nextChecked) {
@@ -316,7 +318,8 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
     const [qrZoomPin, setQrZoomPin] = useState<string | null>(null);
     const qrCanvasContainerRef = useRef<HTMLDivElement>(null);
     const [showTacticalBoard, setShowTacticalBoard] = useState(false);
-    const anyModalOpen = !!(matchState?.setEnded || serveOrderModalTeam || showTournamentPasswordModal || (showQRZoomModal && qrZoomPin));
+    const [lineupEditTeam, setLineupEditTeam] = useState<'A' | 'B' | null>(null);
+    const anyModalOpen = !!(matchState?.setEnded || serveOrderModalTeam || showTournamentPasswordModal || (showQRZoomModal && qrZoomPin) || lineupEditTeam);
     useEffect(() => {
         if (anyModalOpen) document.body.style.overflow = 'hidden';
         return () => { document.body.style.overflow = ''; };
@@ -1023,6 +1026,28 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
                             <span className="hidden sm:inline">전술판</span>
                         </button>
                     )}
+                    {entryMode === 'club' && matchState.status === 'in_progress' && (
+                        <>
+                            <button
+                                type="button"
+                                onClick={() => setLineupEditTeam('A')}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-700 hover:bg-emerald-600/80 border border-slate-600 hover:border-emerald-500/50 text-slate-200 hover:text-white font-semibold text-sm min-h-[44px] transition-colors flex-shrink-0"
+                                title="우리 팀 라인업"
+                            >
+                                <span>👥</span>
+                                <span className="hidden sm:inline">우리 라인업</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setLineupEditTeam('B')}
+                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-700 hover:bg-rose-600/80 border border-slate-600 hover:border-rose-500/50 text-slate-200 hover:text-white font-semibold text-sm min-h-[44px] transition-colors flex-shrink-0"
+                                title="상대 팀 라인업"
+                            >
+                                <span>🆚</span>
+                                <span className="hidden sm:inline">상대 라인업</span>
+                            </button>
+                        </>
+                    )}
                     {entryMode === 'club' && matchState.status === 'in_progress' && p2p.isHost && (
                         <button
                             type="button"
@@ -1290,56 +1315,83 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
                         <p className="text-slate-300 text-lg mb-4">
                             {matchState.teamA.name} {matchState.completedSetScore?.a ?? 0} : {matchState.completedSetScore?.b ?? 0} {matchState.teamB.name}
                         </p>
-                        {entryMode === 'club' && matchState.matchType === 'practice' ? (
-                            <div className="flex flex-col gap-3">
+                        {(() => {
+                            const courtChangeOn = matchState.courtChangeEnabled !== false;
+                            const isPracticeUnlimited = entryMode === 'club'
+                                && matchState.matchType === 'practice'
+                                && matchState.setsUnlimited !== false;
+                            const goNextSet = () => {
+                                const init = initialLineupRef.current;
+                                const restoreInitialLineup = entryMode === 'club' && init && matchState.matchType !== 'practice';
+                                if (restoreInitialLineup) {
+                                    dispatch({
+                                        type: 'START_NEXT_SET',
+                                        initialOnCourtA: init.onCourtA,
+                                        initialBenchA: init.benchA,
+                                        initialOnCourtB: init.onCourtB,
+                                        initialBenchB: init.benchB,
+                                    });
+                                } else {
+                                    dispatch({ type: 'START_NEXT_SET' });
+                                }
+                                if (courtChangeOn) setIsSwapped(prev => !prev);
+                            };
+                            if (isPracticeUnlimited) {
+                                return (
+                                    <div className="flex flex-col gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveFinalResult}
+                                            className="w-full py-4 px-6 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg transition-colors"
+                                        >
+                                            결과 저장
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={goNextSet}
+                                            className="w-full py-4 px-6 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-lg transition-colors"
+                                        >
+                                            {courtChangeOn ? '다음 세트 시작 (코트 체인지)' : '다음 세트 시작'}
+                                        </button>
+                                        <p className="text-slate-500 text-xs">출전 명단·서브 순서는 유지됩니다. 세트 수 제한 없음.</p>
+                                    </div>
+                                );
+                            }
+                            return (
                                 <button
                                     type="button"
-                                    onClick={handleSaveFinalResult}
-                                    className="w-full py-4 px-6 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-lg transition-colors"
-                                >
-                                    결과 저장
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        dispatch({ type: 'START_NEXT_SET' });
-                                        setIsSwapped(prev => !prev);
-                                    }}
+                                    onClick={goNextSet}
                                     className="w-full py-4 px-6 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-lg transition-colors"
                                 >
-                                    다음 세트 시작 (코트 체인지)
+                                    {courtChangeOn ? '다음 세트 진행 (코트 체인지)' : '다음 세트 진행'}
                                 </button>
-                                <p className="text-slate-500 text-xs">출전 명단·서브 순서는 유지됩니다. 세트 수 제한 없음.</p>
-                            </div>
-                        ) : (
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const init = initialLineupRef.current;
-                                    const restoreInitialLineup = entryMode === 'club' && init && matchState.matchType !== 'practice';
-                                    if (restoreInitialLineup) {
-                                        dispatch({
-                                            type: 'START_NEXT_SET',
-                                            initialOnCourtA: init.onCourtA,
-                                            initialBenchA: init.benchA,
-                                            initialOnCourtB: init.onCourtB,
-                                            initialBenchB: init.benchB,
-                                        });
-                                    } else {
-                                        dispatch({ type: 'START_NEXT_SET' });
-                                    }
-                                    setIsSwapped(prev => !prev);
-                                }}
-                                className="w-full py-4 px-6 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-lg transition-colors"
-                            >
-                                다음 세트 진행
-                            </button>
-                        )}
+                            );
+                        })()}
                     </div>
                 </div>
             )}
 
             {/* Modals */}
+            {entryMode === 'club' && lineupEditTeam && matchState && (
+                <BroadcastLineupModal
+                    isOpen={!!lineupEditTeam}
+                    onClose={() => setLineupEditTeam(null)}
+                    teamKey={lineupEditTeam}
+                    team={lineupEditTeam === 'A' ? matchState.teamA : matchState.teamB}
+                    onSave={(next: TeamMatchState) => {
+                        if (!matchState) return;
+                        dispatch({
+                            type: 'LOAD_STATE',
+                            state: {
+                                ...matchState,
+                                teamA: lineupEditTeam === 'A' ? next : matchState.teamA,
+                                teamB: lineupEditTeam === 'B' ? next : matchState.teamB,
+                            },
+                        });
+                        showToast(`${lineupEditTeam === 'A' ? '우리' : '상대'} 팀 라인업이 저장되었습니다.`, 'success');
+                    }}
+                />
+            )}
             {entryMode === 'club' && <TacticalBoardModal isOpen={showTacticalBoard} onClose={() => setShowTacticalBoard(false)} appMode="CLUB" initialMatchState={matchState} />}
             {entryMode === 'club' && p2p.isHost && matchState.status === 'in_progress' && showLiveBroadcastSettings && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowLiveBroadcastSettings(false)}>

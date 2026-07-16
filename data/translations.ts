@@ -91,6 +91,7 @@ export const translations: Record<string, Record<Language, string>> = {
   tournament_title: { ko: "토너먼트", id: "TURNAMEN" },
   league_title: { ko: "리그", id: "LIGA" },
   competition_title: { ko: "대회 모드", id: "MODE KOMPETISI" },
+  scheduled_broadcast_title: { ko: "방송 예약", id: "Jadwal Siaran" },
   announcer_title: { ko: "아나운서", id: "penyiar" },
   camera_director_title: { ko: "카메라 감독", id: "SUTRADARA KAMERA" },
 
