@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useData } from '../contexts/DataContext';
 import { ScheduledBroadcast, ScheduledRosterPlayer } from '../types';
@@ -274,8 +274,9 @@ const ManualStartModal: React.FC<ManualStartModalProps> = ({ isOpen, onClose, on
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
             <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-amber-500/40 bg-slate-900 shadow-2xl" onClick={e => e.stopPropagation()}>
                 <div className="border-b border-slate-700 px-5 py-4">
-                    <h2 className="text-xl font-bold text-amber-400">코드로 직접 시작</h2>
-                    <p className="mt-1 text-sm text-slate-400">라인업 없이 바로 전광판으로 시작할 수 있습니다. 명단은 전광판에서 채울 수 있습니다.</p>
+                    <h2 className="text-xl font-bold text-amber-400">이 코드로 경기 시작 (관리자·송출)</h2>
+                    <p className="mt-1 text-sm text-slate-400">관리자(호스트)로서 방송을 시작합니다. 라인업 없이 바로 전광판으로 진입하며, 명단은 전광판에서 채울 수 있습니다.</p>
+                    <p className="mt-2 text-xs text-amber-300/80">시청만 하려면 이 화면이 아니라 공유받은 URL 또는 메인의 「실시간 세션 참여」를 이용하세요.</p>
                 </div>
                 <div className="space-y-3 px-5 py-4">
                     <label className="block">
@@ -316,7 +317,7 @@ const ManualStartModal: React.FC<ManualStartModalProps> = ({ isOpen, onClose, on
                         }}
                         className="flex-1 rounded-xl bg-amber-600 py-3 font-bold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:bg-slate-600"
                     >
-                        바로 시작
+                        이 코드로 경기 시작하기
                     </button>
                 </div>
             </div>
@@ -332,13 +333,77 @@ const STATUS_LABEL: Record<ScheduledBroadcast['status'], string> = {
 };
 
 interface ScheduledBroadcastScreenProps {
-    onStartBroadcast: (item: Partial<ScheduledBroadcast> & { code: string }) => void;
+    onStartBroadcast: (
+        item: Partial<ScheduledBroadcast> & { code: string },
+        options?: { homeCourt: 'left' | 'right' }
+    ) => void;
 }
+
+type HomeCourtSide = 'left' | 'right';
+
+const CourtSelectModal: React.FC<{
+    isOpen: boolean;
+    homeTeamName: string;
+    awayTeamName: string;
+    onCancel: () => void;
+    onConfirm: (side: HomeCourtSide) => void;
+}> = ({ isOpen, homeTeamName, awayTeamName, onCancel, onConfirm }) => {
+    const [side, setSide] = useState<HomeCourtSide>('left');
+
+    useEffect(() => {
+        if (isOpen) setSide('left');
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    const home = homeTeamName.trim() || '우리 팀';
+    const away = awayTeamName.trim() || '상대 팀';
+
+    return (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 p-4" role="dialog" aria-modal="true">
+            <div className="w-full max-w-md rounded-2xl border border-sky-500/40 bg-slate-900 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="border-b border-slate-700 px-5 py-4">
+                    <h2 className="text-xl font-bold text-sky-400">우리 팀 코트 선택</h2>
+                    <p className="mt-1 text-sm text-slate-400">전광판에서 우리 팀이 어느쪽에 표시될지 고르세요.</p>
+                </div>
+                <div className="space-y-3 px-5 py-4">
+                    <button
+                        type="button"
+                        onClick={() => setSide('left')}
+                        className={`w-full rounded-xl border-2 px-4 py-3 text-left transition-colors ${
+                            side === 'left' ? 'border-emerald-400 bg-emerald-500/15' : 'border-slate-600 bg-slate-800/50 hover:border-slate-500'
+                        }`}
+                    >
+                        <p className="font-bold text-white">왼쪽 코트</p>
+                        <p className="mt-1 text-sm text-slate-400">{home} (왼) · {away} (오)</p>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setSide('right')}
+                        className={`w-full rounded-xl border-2 px-4 py-3 text-left transition-colors ${
+                            side === 'right' ? 'border-emerald-400 bg-emerald-500/15' : 'border-slate-600 bg-slate-800/50 hover:border-slate-500'
+                        }`}
+                    >
+                        <p className="font-bold text-white">오른쪽 코트</p>
+                        <p className="mt-1 text-sm text-slate-400">{away} (왼) · {home} (오)</p>
+                    </button>
+                </div>
+                <div className="flex gap-2 border-t border-slate-700 px-5 py-4">
+                    <button type="button" onClick={onCancel} className="flex-1 rounded-xl bg-slate-700 py-3 font-semibold text-slate-200 hover:bg-slate-600">취소</button>
+                    <button type="button" onClick={() => onConfirm(side)} className="flex-1 rounded-xl bg-sky-600 py-3 font-bold text-white hover:bg-sky-500">
+                        경기 시작
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 const ScheduledBroadcastScreen: React.FC<ScheduledBroadcastScreenProps> = ({ onStartBroadcast }) => {
     const { scheduledBroadcasts, cancelScheduledBroadcast, showToast } = useData();
     const [showCreate, setShowCreate] = useState(false);
     const [showManual, setShowManual] = useState(false);
+    const [pendingStart, setPendingStart] = useState<(Partial<ScheduledBroadcast> & { code: string }) | null>(null);
 
     const sorted = useMemo(
         () => [...scheduledBroadcasts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
@@ -364,7 +429,7 @@ const ScheduledBroadcastScreen: React.FC<ScheduledBroadcastScreenProps> = ({ onS
                         + 새 예약 생성
                     </button>
                     <button type="button" onClick={() => setShowManual(true)} className="rounded-xl border border-amber-500/50 bg-amber-500/10 px-4 py-3 font-semibold text-amber-300 hover:bg-amber-500/20">
-                        코드 직접 입력해서 시작
+                        코드 입력해서 경기 시작 (관리자)
                     </button>
                 </div>
             </div>
@@ -408,7 +473,7 @@ const ScheduledBroadcastScreen: React.FC<ScheduledBroadcastScreenProps> = ({ onS
                                             {canStart && (
                                                 <button
                                                     type="button"
-                                                    onClick={() => onStartBroadcast(item)}
+                                                    onClick={() => setPendingStart(item)}
                                                     className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-500"
                                                 >
                                                     경기 시작
@@ -429,7 +494,25 @@ const ScheduledBroadcastScreen: React.FC<ScheduledBroadcastScreenProps> = ({ onS
             )}
 
             <CreateScheduledBroadcastModal isOpen={showCreate} onClose={() => setShowCreate(false)} />
-            <ManualStartModal isOpen={showManual} onClose={() => setShowManual(false)} onStart={onStartBroadcast} />
+            <ManualStartModal
+                isOpen={showManual}
+                onClose={() => setShowManual(false)}
+                onStart={item => {
+                    setShowManual(false);
+                    setPendingStart(item);
+                }}
+            />
+            <CourtSelectModal
+                isOpen={!!pendingStart}
+                homeTeamName={pendingStart?.homeTeamName ?? ''}
+                awayTeamName={pendingStart?.awayTeamName ?? ''}
+                onCancel={() => setPendingStart(null)}
+                onConfirm={side => {
+                    if (!pendingStart) return;
+                    onStartBroadcast(pendingStart, { homeCourt: side });
+                    setPendingStart(null);
+                }}
+            />
         </div>
     );
 };

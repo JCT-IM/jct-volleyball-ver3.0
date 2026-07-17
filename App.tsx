@@ -210,6 +210,8 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
     const [showPracticeOptionsModal, setShowPracticeOptionsModal] = useState(false);
     const [practiceMatchOptions, setPracticeMatchOptions] = useState<PracticeMatchOptions>(DEFAULT_PRACTICE_OPTIONS);
     const [pendingFixedPin, setPendingFixedPin] = useState<string | null>(null);
+    /** 예약 방송 전용: 우리 팀(A)을 오른쪽에 두면 true */
+    const [scheduledHomeOnRight, setScheduledHomeOnRight] = useState(false);
     const { t } = useTranslation();
 
     // 전역 화면 잠금 (앱 어디서든 잠금 버튼 노출, 잠금 시 전체 오버레이)
@@ -396,12 +398,14 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
         });
         setPendingFixedPin(null);
         setIsNextMatchPractice(false);
+        setScheduledHomeOnRight(false);
         setScoreboardMode('record');
         setView('scoreboard');
     };
     
     const handleStartRefereeMatch = (teams: { teamA: string, teamB: string, teamAKey?: string, teamBKey?: string }) => {
         setIsNextMatchPractice(false);
+        setScheduledHomeOnRight(false);
         startMatch(teams);
         setScoreboardMode('referee');
         setView('scoreboard');
@@ -409,13 +413,17 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
     
     const handleContinueGame = (gameState: MatchState) => {
         setIsNextMatchPractice(false);
+        setScheduledHomeOnRight(false);
         startMatch(undefined, gameState);
         setScoreboardMode('record');
         setView('scoreboard');
     };
 
     /** 예약 방송: MatchSetup/Attendance 없이 바로 전광판 (라인업은 예약 스냅샷 또는 빈 명단) */
-    const handleStartScheduledBroadcast = async (item: Partial<ScheduledBroadcast> & { code: string }) => {
+    const handleStartScheduledBroadcast = async (
+        item: Partial<ScheduledBroadcast> & { code: string },
+        options?: { homeCourt?: 'left' | 'right' }
+    ) => {
         const code = item.code.trim().toUpperCase();
         const homeName = item.homeTeamName?.trim() || '우리 팀';
         const awayName = item.awayTeamName?.trim() || '상대 팀';
@@ -427,6 +435,7 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
         setIsNextMatchPractice(false);
         setPendingFixedPin(null);
         setEntryMode('club');
+        setScheduledHomeOnRight(options?.homeCourt === 'right');
         startMatch(
             { teamA: homeName, teamB: awayName, teamAInfo, teamBInfo },
             undefined,
@@ -474,6 +483,7 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
         setSelectedLeagueId(null);
         setIsNextMatchPractice(false);
         setPendingFixedPin(null);
+        setScheduledHomeOnRight(false);
         closeSession();
         setView('menu');
     }
@@ -507,7 +517,7 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
                 }
                 return <AttendanceScreen appMode={appMode} teamSelection={teamsForAttendance} onStartMatch={handleStartMatchFromAttendance} />;
             case 'scoreboard':
-                return <ScoreboardScreen onBackToMenu={navigateToMenu} mode={scoreboardMode} entryMode={entryMode} />;
+                return <ScoreboardScreen onBackToMenu={navigateToMenu} mode={scoreboardMode} entryMode={entryMode} initialIsSwapped={scheduledHomeOnRight} />;
             case 'history':
                 return <RecordScreen appMode={appMode} onContinueGame={handleContinueGame} preselectedMatchId={preselectedMatchId} onClearPreselection={() => setPreselectedMatchId(null)} />;
             case 'playerRecords':

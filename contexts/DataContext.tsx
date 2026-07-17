@@ -2471,7 +2471,12 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
         });
         newPeer.on('error', (err: any) => {
             console.error("PeerJS host error:", err);
-            const message = err.type === 'peer-unavailable' ? '호스트에 연결할 수 없습니다.' : `연결 오류: ${err.type}`;
+            const message =
+                err.type === 'unavailable-id'
+                    ? `이미 코드 ${pin}(으)로 다른 곳에서 방송 중입니다. 기존 방송을 종료하거나 다른 코드를 사용해 주세요.`
+                    : err.type === 'peer-unavailable'
+                        ? '호스트에 연결할 수 없습니다.'
+                        : `연결 오류: ${err.type}`;
             setP2p(prev => ({ ...prev, status: 'error', error: message, isConnected: false }));
             showToast(message, 'error');
         });

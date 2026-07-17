@@ -152,6 +152,8 @@ interface ScoreboardProps {
     mode: 'record' | 'referee';
     /** 진입 트랙: class = 교과 수업 모드, club = 학교스포츠클럽 모드 (추후 로직 분리용) */
     entryMode?: 'class' | 'club';
+    /** 예약 방송 시작 시 우리 팀(A)을 오른쪽에 두려면 true (기본 false = 왼쪽) */
+    initialIsSwapped?: boolean;
 }
 
 type PendingAction = {
@@ -159,7 +161,7 @@ type PendingAction = {
     team: 'A' | 'B';
 };
 
-export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode, entryMode = 'class' }) => {
+export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode, entryMode = 'class', initialIsSwapped = false }) => {
     const location = useLocation();
     const isClubMode = location.pathname.startsWith('/club');
     const {
@@ -203,7 +205,7 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
     const [tickerInput, setTickerInput] = useState('');
     const [showLiveBroadcastSettings, setShowLiveBroadcastSettings] = useState(false);
     const [youtubeVideoIdInput, setYoutubeVideoIdInput] = useState('');
-    const [isSwapped, setIsSwapped] = useState(false);
+    const [isSwapped, setIsSwapped] = useState(!!initialIsSwapped);
     const courtChangeAt8DoneRef = useRef(false);
     const latestIsTournamentModeRef = useRef(false);
     const initialLineupRef = useRef<{ onCourtA: string[]; benchA: string[]; onCourtB: string[]; benchB: string[] } | null>(null);

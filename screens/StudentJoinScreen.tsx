@@ -18,12 +18,14 @@ interface StudentJoinScreenProps {
     onBackToLock: () => void;
     appMode?: 'CLASS' | 'CLUB';
     pendingJoinCode?: string | null;
+    /** @deprecated 연결 성공 후에도 URL(code/liveView)을 유지해 새로고침 시 자동 재접속되도록 더 이상 호출하지 않음 */
     clearPendingJoinCode?: () => void;
 }
 
-const POLL_INTERVAL_MS = 4000;
+/** 여러 기기의 재시도가 동시에 몰리지 않도록 3~5초 사이 랜덤 지연(jitter) */
+const nextPollDelayMs = () => 3000 + Math.floor(Math.random() * 2000);
 
-const StudentJoinScreen: React.FC<StudentJoinScreenProps> = ({ onBackToLock, appMode = 'CLASS', pendingJoinCode, clearPendingJoinCode }) => {
+const StudentJoinScreen: React.FC<StudentJoinScreenProps> = ({ onBackToLock, appMode = 'CLASS', pendingJoinCode }) => {
     const { joinSession, p2p } = useData();
     const { t } = useTranslation();
     const meta = getBroadcastMetaFromUrl();
@@ -50,7 +52,7 @@ const StudentJoinScreen: React.FC<StudentJoinScreenProps> = ({ onBackToLock, app
             setIsJoining(false);
             setIsWaitingForHost(false);
             clearPoll();
-            clearPendingJoinCode?.();
+            // URL의 code/liveView는 그대로 유지 → 새로고침 시 자동 재접속 가능
         }, { silent: true });
     };
 
@@ -65,13 +67,12 @@ const StudentJoinScreen: React.FC<StudentJoinScreenProps> = ({ onBackToLock, app
                 setIsJoining(true);
                 joinSession(pendingJoinCode, () => {
                     setIsJoining(false);
-                    clearPendingJoinCode?.();
                 });
             }
         }
         return () => clearPoll();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pendingJoinCode, joinSession, clearPendingJoinCode, isBroadcastWaitMode]);
+    }, [pendingJoinCode, joinSession, isBroadcastWaitMode]);
 
     useEffect(() => {
         if (!isWaitingForHost || p2p.isConnected) return;
@@ -80,7 +81,7 @@ const StudentJoinScreen: React.FC<StudentJoinScreenProps> = ({ onBackToLock, app
             clearPoll();
             pollTimerRef.current = setTimeout(() => {
                 if (joinId.trim()) tryJoinSilent(joinId.trim().toUpperCase());
-            }, POLL_INTERVAL_MS);
+            }, nextPollDelayMs());
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [p2p.status, p2p.isConnected, isWaitingForHost, isJoining, joinId]);
@@ -133,7 +134,7 @@ const StudentJoinScreen: React.FC<StudentJoinScreenProps> = ({ onBackToLock, app
                         </div>
                     )}
                     <p className="text-xs text-slate-500 font-mono tracking-widest">코드 {joinId}</p>
-                    <p className="mt-3 text-xs text-slate-500">약 {POLL_INTERVAL_MS / 1000}초마다 재시도 중…</p>
+                    <p className="mt-3 text-xs text-slate-500">{isJoining ? '재연결 중…' : '몇 초 후 자동으로 재시도합니다…'}</p>
                     <button
                         type="button"
                         onClick={onBackToLock}
