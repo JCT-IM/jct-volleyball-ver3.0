@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { TeamMatchState, Player, Action } from '../types';
 import { useTranslation } from '../hooks/useTranslation';
+import { createPlayerFromRosterEntry, emptyPlayerStats } from '../utils/scheduledBroadcastRoster';
 
 interface SubstitutionModalProps {
     isOpen: boolean;
@@ -12,9 +13,143 @@ interface SubstitutionModalProps {
     showPlayerMemo?: boolean;
     isClubMode?: boolean;
     onOpenPlayerAnalysisMemo?: (player: Player, team: 'A' | 'B') => void;
+    /** CLUB 라이브/예약 방송: 교체 UI 안에서 명단(추가/삭제/이름/등번호/일괄) 편집 허용 */
+    enableRosterEdit?: boolean;
+    /** 명단 편집 저장 콜백 (enableRosterEdit일 때 필수) */
+    onSaveRoster?: (team: 'A' | 'B', next: TeamMatchState) => void;
 }
 
 type PendingSubstitution = { id: string; playerOut: string; playerIn: string; outName: string; inName: string };
+
+/** 구 BroadcastLineupModal에서 이관: 팀 이름·선수 추가/삭제/이름/등번호/일괄 입력 편집 패널 */
+const RosterEditorPanel: React.FC<{
+    team: TeamMatchState;
+    teamKey: 'A' | 'B';
+    onSave: (next: TeamMatchState) => void;
+    onSaved: () => void;
+}> = ({ team, teamKey, onSave, onSaved }) => {
+    const [teamName, setTeamName] = useState(team.name);
+    const [rows, setRows] = useState<{ id: string; name: string; number: string }[]>([]);
+    const [bulkText, setBulkText] = useState('');
+
+    useEffect(() => {
+        setTeamName(team.name);
+        setRows(
+            Object.values(team.players ?? {}).map(p => ({
+                id: p.id,
+                name: p.originalName,
+                number: p.studentNumber || '',
+            }))
+        );
+        setBulkText('');
+    }, [team, teamKey]);
+
+    const addEmptyRow = () => {
+        setRows(prev => [...prev, { id: `new-${Date.now()}-${prev.length}`, name: '', number: String(prev.length + 1) }]);
+    };
+
+    const applyBulk = () => {
+        const names = bulkText.split(/[\n,]/).map(s => s.trim()).filter(Boolean);
+        if (!names.length) return;
+        setRows(names.map((name, i) => ({ id: `bulk-${Date.now()}-${i}`, name, number: String(i + 1) })));
+        setBulkText('');
+    };
+
+    const handleSave = () => {
+        const cleaned = rows.filter(r => r.name.trim());
+        const players: Record<string, Player> = {};
+        const playerStats: TeamMatchState['playerStats'] = {};
+        const onCourt: string[] = [];
+        cleaned.forEach((r, i) => {
+            const p = createPlayerFromRosterEntry({ id: r.id, name: r.name.trim(), number: r.number }, i, `live-${teamKey}`);
+            // 기존 선수면 스탯/메모 유지
+            const prev = team.players?.[r.id];
+            if (prev) {
+                p.stats = prev.stats;
+                p.memo = prev.memo;
+                p.isLibero = prev.isLibero;
+                p.isCaptain = prev.isCaptain;
+            }
+            players[p.id] = p;
+            playerStats[p.id] = team.playerStats?.[r.id] ?? emptyPlayerStats();
+            onCourt.push(p.id);
+        });
+        onSave({
+            ...team,
+            name: teamName.trim() || team.name || (teamKey === 'A' ? '우리 팀' : '상대 팀'),
+            players,
+            playerStats,
+            onCourtPlayerIds: onCourt,
+            benchPlayerIds: [],
+            currentServerIndex: onCourt.length ? Math.min(team.currentServerIndex ?? 0, onCourt.length - 1) : 0,
+        });
+        onSaved();
+    };
+
+    return (
+        <div className="space-y-3">
+            <p className="text-slate-400 text-sm text-center">경기 중에도 선수 추가·삭제·이름 수정이 가능합니다. 저장 시 전체 명단이 코트에 배치됩니다.</p>
+            <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-slate-300">팀 이름</span>
+                <input
+                    value={teamName}
+                    onChange={e => setTeamName(e.target.value)}
+                    className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-sky-500"
+                />
+            </label>
+            <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-300">선수 목록 ({rows.length})</span>
+                    <button type="button" onClick={addEmptyRow} className="text-sm font-semibold text-sky-400 hover:text-sky-300">+ 선수 추가</button>
+                </div>
+                {rows.length === 0 && (
+                    <p className="rounded-lg border border-dashed border-slate-600 p-3 text-center text-sm text-slate-500">선수가 없습니다. 위의 「+ 선수 추가」 또는 아래 일괄 입력으로 추가하세요.</p>
+                )}
+                {rows.map((row, idx) => (
+                    <div key={row.id} className="flex gap-2">
+                        <input
+                            value={row.number}
+                            onChange={e => setRows(prev => prev.map((r, i) => i === idx ? { ...r, number: e.target.value } : r))}
+                            placeholder="No"
+                            className="w-14 rounded-lg border border-slate-600 bg-slate-800 px-2 py-2 text-center text-white"
+                        />
+                        <input
+                            value={row.name}
+                            onChange={e => setRows(prev => prev.map((r, i) => i === idx ? { ...r, name: e.target.value } : r))}
+                            placeholder="이름"
+                            className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setRows(prev => prev.filter((_, i) => i !== idx))}
+                            className="rounded-lg bg-red-800/80 px-3 py-2 text-sm text-white hover:bg-red-700"
+                        >
+                            삭제
+                        </button>
+                    </div>
+                ))}
+            </div>
+            <div>
+                <span className="mb-1 block text-sm font-semibold text-slate-300">일괄 입력 (줄바꿈/쉼표)</span>
+                <textarea
+                    value={bulkText}
+                    onChange={e => setBulkText(e.target.value)}
+                    rows={3}
+                    placeholder={"김민수\n이서연\n박지훈"}
+                    className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                />
+                <button type="button" onClick={applyBulk} className="mt-2 rounded-lg bg-slate-700 px-3 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-600">
+                    목록으로 적용 (기존 덮어쓰기)
+                </button>
+            </div>
+            <div className="flex justify-end pt-1">
+                <button type="button" onClick={handleSave} className="rounded-xl bg-sky-600 px-6 py-2.5 font-bold text-white hover:bg-sky-500">
+                    명단 저장
+                </button>
+            </div>
+        </div>
+    );
+};
 
 const SubstitutionModal: React.FC<SubstitutionModalProps> = ({
     isOpen,
@@ -25,9 +160,12 @@ const SubstitutionModal: React.FC<SubstitutionModalProps> = ({
     showPlayerMemo = false,
     isClubMode = false,
     onOpenPlayerAnalysisMemo,
+    enableRosterEdit = false,
+    onSaveRoster,
 }) => {
     const { t } = useTranslation();
     const [selectedTeam, setSelectedTeam] = useState<'A' | 'B'>('A');
+    const [editMode, setEditMode] = useState<'substitute' | 'roster'>('substitute');
     const [playerOut, setPlayerOut] = useState<string | null>(null);
     const [playerIn, setPlayerIn] = useState<string | null>(null);
     const [pendingOutId, setPendingOutId] = useState<string | null>(null);
@@ -95,6 +233,7 @@ const SubstitutionModal: React.FC<SubstitutionModalProps> = ({
         setPendingOutId(null);
         setPendingInId(null);
         setPendingSubstitutions([]);
+        setEditMode('substitute');
         onClose();
     };
 
@@ -129,6 +268,45 @@ const SubstitutionModal: React.FC<SubstitutionModalProps> = ({
 
                 {isClubMode ? (
                     <>
+                        {enableRosterEdit && (
+                            <div className="flex justify-center gap-2 mb-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setEditMode('substitute')}
+                                    className={`px-4 py-2 rounded-lg text-sm font-semibold ${editMode === 'substitute' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                                >
+                                    🔄 선수 교체
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditMode('roster')}
+                                    className={`px-4 py-2 rounded-lg text-sm font-semibold ${editMode === 'roster' ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                                >
+                                    📝 명단 편집
+                                </button>
+                            </div>
+                        )}
+                        {enableRosterEdit && editMode === 'roster' ? (
+                            <RosterEditorPanel
+                                key={selectedTeam}
+                                team={team}
+                                teamKey={selectedTeam}
+                                onSave={(next) => onSaveRoster?.(selectedTeam, next)}
+                                onSaved={() => setEditMode('substitute')}
+                            />
+                        ) : enableRosterEdit && onCourtPlayers.length === 0 && benchPlayers.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center gap-3 py-10 text-center">
+                                <p className="text-slate-400">이 팀에는 아직 선수가 없어 교체할 수 없습니다.</p>
+                                <button
+                                    type="button"
+                                    onClick={() => setEditMode('roster')}
+                                    className="rounded-xl bg-sky-600 px-5 py-2.5 font-bold text-white hover:bg-sky-500"
+                                >
+                                    📝 명단 편집에서 선수 추가
+                                </button>
+                            </div>
+                        ) : (
+                        <>
                         <p className="text-slate-400 text-sm mb-3 text-center">
                             코트(Out) 1명과 벤치(In) 1명을 선택한 뒤 <span className="text-sky-400 font-semibold">페어 추가</span>를 누르세요. 목록이 완성되면 일괄 교체 적용합니다.
                         </p>
@@ -227,6 +405,8 @@ const SubstitutionModal: React.FC<SubstitutionModalProps> = ({
                                 교체 실행 ({pendingSubstitutions.length}건)
                             </button>
                         </div>
+                        </>
+                        )}
                     </>
                 ) : (
                     <>

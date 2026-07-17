@@ -26,7 +26,7 @@ interface StudentJoinScreenProps {
 const nextPollDelayMs = () => 3000 + Math.floor(Math.random() * 2000);
 
 const StudentJoinScreen: React.FC<StudentJoinScreenProps> = ({ onBackToLock, appMode = 'CLASS', pendingJoinCode }) => {
-    const { joinSession, p2p } = useData();
+    const { joinSession, p2p, matchState } = useData();
     const { t } = useTranslation();
     const meta = getBroadcastMetaFromUrl();
     const liveView = meta.liveView;
@@ -104,7 +104,10 @@ const StudentJoinScreen: React.FC<StudentJoinScreenProps> = ({ onBackToLock, app
         });
     };
 
-    if (p2p.isConnected) {
+    // 경기 종료 후 호스트가 방송을 닫아도(연결 해제) 결과 화면을 계속 표시
+    const keepShowingEndedBroadcast = !!matchState?.gameOver && (appMode === 'CLUB' || liveView === 'broadcast');
+
+    if (p2p.isConnected || keepShowingEndedBroadcast) {
         if (appMode === 'CLUB' || liveView === 'broadcast') {
             return <LiveBroadcastScreen />;
         }
@@ -121,27 +124,62 @@ const StudentJoinScreen: React.FC<StudentJoinScreenProps> = ({ onBackToLock, app
     }
 
     if (isWaitingForHost) {
+        // 매치업("A팀 VS B팀") 문자열을 팀별로 분리해 강조 표시 (형식이 다르면 원문 그대로)
+        const vsParts = meta.desc ? meta.desc.split(/\s+VS\s+/i) : [];
+        const hasVsLayout = vsParts.length === 2;
+
         return (
-            <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex flex-col items-center justify-center p-6">
-                <div className="w-full max-w-md bg-slate-800/80 rounded-2xl border border-sky-500/40 shadow-2xl p-8 text-center">
-                    <div className="mx-auto mb-4 h-12 w-12 rounded-full border-4 border-sky-400 border-t-transparent animate-spin" />
-                    <h2 className="text-xl font-bold text-sky-400 mb-2">경기 시작 대기 중</h2>
-                    <p className="text-slate-400 text-sm mb-6">관리자가 경기를 시작하면 자동으로 연결됩니다.</p>
-                    {(meta.title || meta.desc) && (
-                        <div className="rounded-xl border border-slate-600 bg-slate-900/70 p-4 text-left space-y-2 mb-4">
-                            {meta.title && <p className="font-bold text-slate-100 text-lg">{meta.title}</p>}
-                            {meta.desc && <p className="text-slate-300">{meta.desc}</p>}
+            <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 flex flex-col items-center justify-center px-4 py-8">
+                <div className="w-full max-w-md flex flex-col items-center text-center">
+                    {/* 1. 상단 라벨 */}
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/40 bg-sky-500/10 px-3 py-1 text-xs font-semibold tracking-widest text-sky-300">
+                        <span className="relative flex h-2 w-2">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-60" />
+                            <span className="relative inline-flex h-2 w-2 rounded-full bg-sky-400" />
+                        </span>
+                        LIVE 대기
+                    </span>
+
+                    {/* 2. 매치업 히어로 카드 — 시청자가 가장 궁금한 정보 */}
+                    <div className="mt-4 w-full rounded-2xl border border-sky-500/30 bg-slate-900/80 shadow-2xl px-5 py-6 backdrop-blur-sm">
+                        {meta.title && (
+                            <p className="text-xs sm:text-sm font-semibold text-slate-400 mb-3 break-words">{meta.title}</p>
+                        )}
+                        {hasVsLayout ? (
+                            <div className="flex items-center justify-center gap-3">
+                                <p className="flex-1 min-w-0 text-right text-xl sm:text-2xl font-extrabold text-sky-300 break-words">{vsParts[0]}</p>
+                                <span className="shrink-0 rounded-lg bg-slate-800 border border-slate-600 px-2 py-1 text-xs font-black text-slate-400">VS</span>
+                                <p className="flex-1 min-w-0 text-left text-xl sm:text-2xl font-extrabold text-rose-300 break-words">{vsParts[1]}</p>
+                            </div>
+                        ) : meta.desc ? (
+                            <p className="text-xl sm:text-2xl font-extrabold text-slate-100 break-words">{meta.desc}</p>
+                        ) : (
+                            <p className="text-xl sm:text-2xl font-extrabold text-slate-100">🏐 라이브 경기</p>
+                        )}
+                    </div>
+
+                    {/* 3. 상태 표시 */}
+                    <div className="mt-8 flex flex-col items-center gap-3">
+                        <div className="h-10 w-10 rounded-full border-[3px] border-sky-400 border-t-transparent animate-spin" />
+                        <div>
+                            <h2 className="text-lg font-bold text-slate-100">경기 시작 대기 중</h2>
+                            <p className="mt-1 text-sm text-slate-400">
+                                {isJoining ? '연결을 시도하고 있어요…' : '관리자가 경기를 시작하면 자동으로 연결됩니다.'}
+                            </p>
                         </div>
-                    )}
-                    <p className="text-xs text-slate-500 font-mono tracking-widest">코드 {joinId}</p>
-                    <p className="mt-3 text-xs text-slate-500">{isJoining ? '재연결 중…' : '몇 초 후 자동으로 재시도합니다…'}</p>
-                    <button
-                        type="button"
-                        onClick={onBackToLock}
-                        className="mt-6 text-sm text-slate-400 underline hover:text-slate-200"
-                    >
-                        돌아가기
-                    </button>
+                    </div>
+
+                    {/* 4. 하단 보조 정보 */}
+                    <div className="mt-10 flex flex-col items-center gap-3">
+                        <p className="text-[11px] text-slate-600 font-mono tracking-[0.3em]">CODE {joinId}</p>
+                        <button
+                            type="button"
+                            onClick={onBackToLock}
+                            className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-300"
+                        >
+                            돌아가기
+                        </button>
+                    </div>
                 </div>
             </div>
         );

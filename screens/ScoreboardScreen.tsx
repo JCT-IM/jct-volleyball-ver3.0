@@ -143,7 +143,6 @@ import confetti from 'canvas-confetti';
 import { isAdminPasswordCorrect } from '../utils/adminPassword';
 import { formatJerseyLabel } from '../utils/formatJerseyNumber';
 import { AnalysisMemoModal, AnalysisMemoFocusTarget } from '../components/AnalysisMemoModal';
-import BroadcastLineupModal from '../components/BroadcastLineupModal';
 
 const CLUB_DEFENSE_FAULT_QUICK_CHIPS = ['준비 안 함', '집중력 저하', '콜 미스', '판단 미스'] as const;
 
@@ -207,6 +206,14 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
     const [youtubeVideoIdInput, setYoutubeVideoIdInput] = useState('');
     const [isSwapped, setIsSwapped] = useState(!!initialIsSwapped);
     const courtChangeAt8DoneRef = useRef(false);
+    // 좌우 스왑 상태를 MatchState에 반영 → full_state_sync로 시청자(LiveBroadcastScreen)에도 동기화
+    useEffect(() => {
+        if (!matchState || matchState.gameOver) return;
+        if (!!matchState.isSwapped !== isSwapped) {
+            dispatch({ type: 'SET_COURT_SWAPPED', value: isSwapped });
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isSwapped, matchState?.isSwapped, matchState?.gameOver]);
     const latestIsTournamentModeRef = useRef(false);
     const initialLineupRef = useRef<{ onCourtA: string[]; benchA: string[]; onCourtB: string[]; benchB: string[] } | null>(null);
     useEffect(() => {
@@ -320,8 +327,7 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
     const [qrZoomPin, setQrZoomPin] = useState<string | null>(null);
     const qrCanvasContainerRef = useRef<HTMLDivElement>(null);
     const [showTacticalBoard, setShowTacticalBoard] = useState(false);
-    const [lineupEditTeam, setLineupEditTeam] = useState<'A' | 'B' | null>(null);
-    const anyModalOpen = !!(matchState?.setEnded || serveOrderModalTeam || showTournamentPasswordModal || (showQRZoomModal && qrZoomPin) || lineupEditTeam);
+    const anyModalOpen = !!(matchState?.setEnded || serveOrderModalTeam || showTournamentPasswordModal || (showQRZoomModal && qrZoomPin));
     useEffect(() => {
         if (anyModalOpen) document.body.style.overflow = 'hidden';
         return () => { document.body.style.overflow = ''; };
@@ -1028,28 +1034,6 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
                             <span className="hidden sm:inline">전술판</span>
                         </button>
                     )}
-                    {entryMode === 'club' && matchState.status === 'in_progress' && (
-                        <>
-                            <button
-                                type="button"
-                                onClick={() => setLineupEditTeam('A')}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-700 hover:bg-emerald-600/80 border border-slate-600 hover:border-emerald-500/50 text-slate-200 hover:text-white font-semibold text-sm min-h-[44px] transition-colors flex-shrink-0"
-                                title="우리 팀 라인업"
-                            >
-                                <span>👥</span>
-                                <span className="hidden sm:inline">우리 라인업</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setLineupEditTeam('B')}
-                                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-700 hover:bg-rose-600/80 border border-slate-600 hover:border-rose-500/50 text-slate-200 hover:text-white font-semibold text-sm min-h-[44px] transition-colors flex-shrink-0"
-                                title="상대 팀 라인업"
-                            >
-                                <span>🆚</span>
-                                <span className="hidden sm:inline">상대 라인업</span>
-                            </button>
-                        </>
-                    )}
                     {entryMode === 'club' && matchState.status === 'in_progress' && p2p.isHost && (
                         <button
                             type="button"
@@ -1374,26 +1358,6 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
             )}
 
             {/* Modals */}
-            {entryMode === 'club' && lineupEditTeam && matchState && (
-                <BroadcastLineupModal
-                    isOpen={!!lineupEditTeam}
-                    onClose={() => setLineupEditTeam(null)}
-                    teamKey={lineupEditTeam}
-                    team={lineupEditTeam === 'A' ? matchState.teamA : matchState.teamB}
-                    onSave={(next: TeamMatchState) => {
-                        if (!matchState) return;
-                        dispatch({
-                            type: 'LOAD_STATE',
-                            state: {
-                                ...matchState,
-                                teamA: lineupEditTeam === 'A' ? next : matchState.teamA,
-                                teamB: lineupEditTeam === 'B' ? next : matchState.teamB,
-                            },
-                        });
-                        showToast(`${lineupEditTeam === 'A' ? '우리' : '상대'} 팀 라인업이 저장되었습니다.`, 'success');
-                    }}
-                />
-            )}
             {entryMode === 'club' && <TacticalBoardModal isOpen={showTacticalBoard} onClose={() => setShowTacticalBoard(false)} appMode="CLUB" initialMatchState={matchState} />}
             {entryMode === 'club' && p2p.isHost && matchState.status === 'in_progress' && showLiveBroadcastSettings && (
                 <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4" onClick={() => setShowLiveBroadcastSettings(false)}>
@@ -1480,6 +1444,19 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
                 showPlayerMemo={entryMode === 'club'}
                 isClubMode={entryMode === 'club'}
                 onOpenPlayerAnalysisMemo={entryMode === 'club' ? openPlayerAnalysisMemo : undefined}
+                enableRosterEdit={entryMode === 'club'}
+                onSaveRoster={(teamKey: 'A' | 'B', next: TeamMatchState) => {
+                    if (!matchState) return;
+                    dispatch({
+                        type: 'LOAD_STATE',
+                        state: {
+                            ...matchState,
+                            teamA: teamKey === 'A' ? next : matchState.teamA,
+                            teamB: teamKey === 'B' ? next : matchState.teamB,
+                        },
+                    });
+                    showToast(`${teamKey === 'A' ? '우리' : '상대'} 팀 명단이 저장되었습니다.`, 'success');
+                }}
             />
             {entryMode === 'club' && (
                 <AnalysisMemoModal

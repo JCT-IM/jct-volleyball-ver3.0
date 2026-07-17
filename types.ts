@@ -240,6 +240,8 @@ export interface MatchState {
     setsUnlimited?: boolean;
     /** 코트 체인지(세트 종료 좌우 스왑 + 결승 세트 8점 스왑) 활성 여부. 미설정 시 CLUB은 기존처럼 활성으로 취급 */
     courtChangeEnabled?: boolean;
+    /** 현재 좌우 코트 스왑 상태 (true면 B팀이 왼쪽). 시청자 화면 동기화용 */
+    isSwapped?: boolean;
     time?: number;
     undoStack?: MatchState[]; // For Undo functionality
     /** 세트 종료 후 [다음 세트 진행] 대기 중일 때 true (코트 체인지 후 다음 세트 시작용) */
@@ -281,7 +283,8 @@ export type Action =
     | { type: 'SUBSTITUTE_PLAYER'; team: 'A' | 'B'; playerIn: string; playerOut: string }
     | { type: 'SUBSTITUTE_PLAYERS'; team: 'A' | 'B'; substitutions: { playerIn: string; playerOut: string }[] }
     | { type: 'UPDATE_PLAYER_MEMO'; team: 'A' | 'B'; playerId: string; memo: string }
-    | { type: 'START_NEXT_SET'; initialOnCourtA?: string[]; initialBenchA?: string[]; initialOnCourtB?: string[]; initialBenchB?: string[] }; // 세트 종료 시 선발 라인업 복구용
+    | { type: 'START_NEXT_SET'; initialOnCourtA?: string[]; initialBenchA?: string[]; initialOnCourtB?: string[]; initialBenchB?: string[] } // 세트 종료 시 선발 라인업 복구용
+    | { type: 'SET_COURT_SWAPPED'; value: boolean }; // 좌우 코트 스왑 동기화 (시청자 화면 반영용)
 
 
 export interface Badge {

@@ -558,6 +558,10 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                 // Keep the current undoStack but remove the last entry
                 const newUndoStack = state.undoStack.slice(0, -1);
                 return { ...previousState, undoStack: newUndoStack };
+            case 'SET_COURT_SWAPPED':
+                // 좌우 스왑은 언두 대상이 아니므로 상위에서 단순 반영
+                if (!state || !!state.isSwapped === action.value) return state;
+                return { ...state, isSwapped: action.value };
             default:
                 if (!state) return null;
                 
@@ -2594,9 +2598,16 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
                         clearTimeout(timeoutId);
                         timeoutId = null;
                     }
-                    if (!silent) showToast('호스트와의 연결이 끊어졌습니다.', 'error');
-                    dispatch({type: 'RESET_STATE'});
-                    closeSession();
+                    // 경기가 이미 종료된 상태라면 결과 화면을 계속 볼 수 있도록 matchState를 유지
+                    const matchEnded = !!latestMatchStateRef.current?.gameOver;
+                    if (matchEnded) {
+                        if (!silent) showToast('방송이 종료되었습니다. 결과 화면을 유지합니다.', 'success');
+                        closeSession();
+                    } else {
+                        if (!silent) showToast('호스트와의 연결이 끊어졌습니다.', 'error');
+                        dispatch({type: 'RESET_STATE'});
+                        closeSession();
+                    }
                 }
             });
             conn.on('error', (err: any) => {
