@@ -806,6 +806,18 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
                         >
                             {t('serve_ace')}
                         </button>
+                        {entryMode !== 'club' && (
+                        <button 
+                            onClick={() => {
+                                playClickSound();
+                                setPendingAction({ actionType: 'SERVICE_FAULT', team: teamKey });
+                            }} 
+                            disabled={!isServing || matchState.gameOver || !!matchState.timeout} 
+                            className={getActionBtnClass('default')}
+                        >
+                            {t('serve_fault')}
+                        </button>
+                        )}
                         <button 
                             onClick={() => {
                                 playClickSound();
