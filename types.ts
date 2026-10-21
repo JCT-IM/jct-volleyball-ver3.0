@@ -254,10 +254,40 @@ export interface MatchState {
     tournamentTargetScore?: number;
     /** 수업 모드 수행평가 기록 여부 */
     isAssessment?: boolean;
-    /** 수행평가 종료 시 선정된 허슬 플레이어(노력상) ID 목록 */
+    /** 수행평가 종료 시 선정된 허슬 플레이어(노력상) ID 목록. 사후 지정은 1명 */
     hustlePlayerIds?: string[];
     /** 상세 보기용: 허슬 플레이어 id, name, team 배열 */
     hustlePlayers?: { id: string; name: string; team: 'A' | 'B' }[];
+    /** 현재 허슬 지정이 경기 종료 후 사후 입력이면 true. 종료 직후 선정은 false 또는 생략 */
+    hustleRetroactive?: boolean;
+    /** 현재 허슬 지정이 저장된 시각(ISO) */
+    hustleUpdatedAt?: string;
+    /** 덮어쓰기 전 허슬 지정. 앞이 더 최근 */
+    hustleHistory?: HustleRevision[];
+    /** 일반 ↔ 수행평가 변경 이력. 앞이 더 최근 */
+    assessmentFlagHistory?: AssessmentFlagRevision[];
+}
+
+/** 허슬 플레이어 한 명의 표시용 스냅샷 */
+export interface HustlePlayerRef {
+    id: string;
+    name: string;
+    team: 'A' | 'B';
+}
+
+/** 더 이상 현재 값이 아닌 허슬 지정 */
+export interface HustleRevision {
+    at: string;
+    source: 'live' | 'retroactive';
+    playerIds: string[];
+    players: HustlePlayerRef[];
+}
+
+/** 경기 유형(일반/수행평가) 변경 한 건 */
+export interface AssessmentFlagRevision {
+    at: string;
+    from: boolean;
+    to: boolean;
 }
 
 export type Action =

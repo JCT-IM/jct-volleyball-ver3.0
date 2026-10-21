@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test:team-detail": "node --experimental-strip-types --test tests/teamDetailStats.test.ts",
+    "test:hustle": "node --experimental-strip-types --test tests/hustleAssignment.test.ts",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist"
   },

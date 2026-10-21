@@ -7,6 +7,7 @@ import localforage from 'localforage';
 import { filterProfanity } from '../utils/filterProfanity';
 import { hashToColor, ADMIN_CHAT_LABEL, ADMIN_CHAT_COLOR } from '../utils/chatUtils';
 import { extractYoutubeVideoId } from '../utils/extractYoutubeVideoId';
+import { collectHustlePlayerIds } from '../utils/hustleAssignment';
 
 const P2P_PIN_PREFIX = 'jive-';
 const PIN_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 영문대문자+숫자 (혼동 가능 문자 제외)
@@ -1096,8 +1097,7 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
 
         completedMatches.forEach(match => {
             const processedPlayersInMatch = new Set<string>();
-            const isAssessment = (match as MatchState & { isAssessment?: boolean }).isAssessment === true;
-            const hustleIds = isAssessment ? ((match as MatchState & { hustlePlayerIds?: string[] }).hustlePlayerIds ?? []) : [];
+            const hustleIds = collectHustlePlayerIds(match);
 
             const processTeam = (teamState: TeamMatchState, isWinner: boolean) => {
                 if (!teamState.players || !teamState.playerStats) return;

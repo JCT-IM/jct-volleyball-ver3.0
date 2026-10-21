@@ -582,6 +582,10 @@ export const ScoreboardScreen: React.FC<ScoreboardProps> = ({ onBackToMenu, mode
                 isAssessment: true,
                 hustlePlayerIds: [...hustlePlayerIds],
                 hustlePlayers: hustlePlayers.map(p => ({ ...p })),
+                ...(hustlePlayerIds.length > 0 && {
+                    hustleRetroactive: false,
+                    hustleUpdatedAt: new Date().toISOString(),
+                }),
             }),
         };
         const newHistory = [finalResult, ...matchHistory];
