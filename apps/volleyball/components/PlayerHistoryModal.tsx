@@ -2,8 +2,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Player, PlayerStats, MatchState, TeamSet, PlayerCumulativeStats, CoachingLog, Badge } from '../types';
 import { useData } from '../contexts/DataContext';
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { LockClosedIcon, CrownIcon } from './icons';
+import { PerformanceTrendChart } from './PerformanceTrendChart';
 import { useTranslation } from '../hooks/useTranslation';
 import { BADGE_DEFINITIONS } from '../data/badges';
 import { BadgeDetailModal } from './BadgeDetailModal';
@@ -497,29 +497,6 @@ export const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ player, 
         return out;
     }, [baseForFilter, allPlayerIds]);
 
-    // Custom Tooltip Component
-    const CustomTooltip = ({ active, payload, label }: any) => {
-        if (active && payload && payload.length) {
-            const data = payload[0].payload;
-            return (
-                <div className="bg-slate-900 border border-slate-700 p-3 rounded shadow-lg text-xs text-white">
-                    <p className="font-bold text-[#00A3FF] mb-1">{label}</p>
-                    <p className="text-slate-300 mb-1">{data.date}</p>
-                    <div className="border-t border-slate-700 my-1 pt-1 space-y-0.5">
-                        <p><span className="text-slate-400">소속:</span> {data.team}</p>
-                        <p><span className="text-slate-400">상대:</span> {data.opponent}</p>
-                        <p><span className="text-slate-400">결과:</span> <span className={data.result === '승' ? 'text-green-400' : 'text-red-400'}>{data.result}</span> ({data.score})</p>
-                    </div>
-                    <p className="mt-2 font-bold text-white border-t border-slate-700 pt-1">
-                        {payload[0].name}: {payload[0].value}
-                    </p>
-                </div>
-            );
-        }
-        return null;
-    };
-
-
     if (!player) return null;
 
     return (
@@ -686,29 +663,10 @@ export const PlayerHistoryModal: React.FC<PlayerHistoryModalProps> = ({ player, 
                                             {(statOrder ?? []).map(key => <option key={key} value={key}>{statDisplayNames?.[key] ?? key}</option>)}
                                         </select>
                                     </div>
-                                    <div className="h-64">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            {chartData.length > 1 ? (
-                                                <LineChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                                    <XAxis dataKey="name" stroke="#94a3b8" />
-                                                    <YAxis allowDecimals={false} stroke="#94a3b8" />
-                                                    <Tooltip content={<CustomTooltip />} />
-                                                    <Legend />
-                                                    <Line type="monotone" dataKey={statDisplayNames?.[chartStat] ?? 'value'} stroke="#0ea5e9" strokeWidth={2} />
-                                                </LineChart>
-                                            ) : (
-                                                <BarChart data={chartData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                                                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                                    <XAxis dataKey="name" stroke="#94a3b8" />
-                                                    <YAxis allowDecimals={false} stroke="#94a3b8" />
-                                                    <Tooltip content={<CustomTooltip />} />
-                                                    <Legend />
-                                                    <Bar dataKey={statDisplayNames?.[chartStat] ?? 'value'} fill="#0ea5e9" barSize={60} />
-                                                </BarChart>
-                                            )}
-                                        </ResponsiveContainer>
-                                    </div>
+                                    <PerformanceTrendChart
+                                        data={chartData}
+                                        dataKey={statDisplayNames?.[chartStat] ?? 'value'}
+                                    />
                                 </div>
                                 
                                  <div className="bg-slate-800/50 p-4 rounded-lg">

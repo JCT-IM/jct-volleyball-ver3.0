@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { ArrowUpIcon, ArrowDownIcon } from '../components/icons';
 import TeamEmblem from '../components/TeamEmblem';
 import { HeatmapViewer, HitRecord } from '../components/HeatmapViewer';
+import { TeamDetailModal } from '../components/TeamDetailModal';
 import { SavedTeamInfo } from '../types';
 import { useTranslation } from '../hooks/useTranslation';
 
@@ -140,6 +141,7 @@ const TeamAnalysisScreen: React.FC<TeamAnalysisScreenProps> = ({ appMode = 'CLAS
     const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
     const [isGraphOnlyMode, setIsGraphOnlyMode] = useState(false);
     const [selectedTeamForHeatmap, setSelectedTeamForHeatmap] = useState<string>('');
+    const [detailTeam, setDetailTeam] = useState<TeamStats | null>(null);
 
     const teamDetailsMap = useMemo(() => {
         const map = new Map<string, SavedTeamInfo & { className: string, teamCount: number }>();
@@ -156,9 +158,8 @@ const TeamAnalysisScreen: React.FC<TeamAnalysisScreenProps> = ({ appMode = 'CLAS
         [...new Set((teamSets ?? []).map((s: { className: string }) => s.className))].filter(Boolean).sort(),
     [teamSets]);
 
-    const teamPerformanceData = useMemo((): TeamStats[] => {
-        const stats: { [teamName: string]: Omit<TeamStats, 'teamName' | 'winRate' | 'avgPointsFor' | 'avgPointsAgainst' | 'className' | 'emblem' | 'color' | 'slogan' | 'teamCount' | 'avgServeSuccess'> } = {};
-
+    /** 표·팀 상세 모달이 함께 보는 완료 경기. 집계 식은 아래 teamPerformanceData 와 같다. */
+    const completedAnalysisMatches = useMemo(() => {
         let matches = sourceMatches.filter((match: any) => match.status === 'completed' && match.winner);
         if (appMode === 'CLUB' && selectedCompetition) {
             matches = matches.filter((match: any) => {
@@ -174,6 +175,13 @@ const TeamAnalysisScreen: React.FC<TeamAnalysisScreenProps> = ({ appMode = 'CLAS
                 return compA === selectedCompetition && compB === selectedCompetition;
             });
         }
+        return matches;
+    }, [sourceMatches, appMode, selectedCompetition, teamSets]);
+
+    const teamPerformanceData = useMemo((): TeamStats[] => {
+        const stats: { [teamName: string]: Omit<TeamStats, 'teamName' | 'winRate' | 'avgPointsFor' | 'avgPointsAgainst' | 'className' | 'emblem' | 'color' | 'slogan' | 'teamCount' | 'avgServeSuccess'> } = {};
+
+        const matches = completedAnalysisMatches;
 
         matches
             .forEach(match => {
@@ -251,7 +259,7 @@ const TeamAnalysisScreen: React.FC<TeamAnalysisScreenProps> = ({ appMode = 'CLAS
                 serveIn: data.serveIn
             };
         });
-    }, [sourceMatches, selectedCompetition, teamDetailsMap, t, appMode, teamSets]);
+    }, [completedAnalysisMatches, teamDetailsMap, t]);
 
     /** 팀별 시즌 누적: 무적 추출 — scoreLocations·history·eventHistory 모두 사용, 팀 ID/HOME/AWAY/A/B 전부 방어 */
     const teamHeatmapData = useMemo(() => {
@@ -509,6 +517,18 @@ const TeamAnalysisScreen: React.FC<TeamAnalysisScreenProps> = ({ appMode = 'CLAS
                     allTeamsData={teamPerformanceData}
                 />
             )}
+            {detailTeam && (
+                <TeamDetailModal
+                    teamName={detailTeam.teamName}
+                    className={detailTeam.className}
+                    teamCount={detailTeam.teamCount}
+                    emblem={detailTeam.emblem}
+                    color={detailTeam.color}
+                    matches={completedAnalysisMatches}
+                    teamSets={teamSets ?? []}
+                    onClose={() => setDetailTeam(null)}
+                />
+            )}
             
             {/* Scrollable Layout */}
             <div className="w-full max-w-[1400px] mx-auto p-4 space-y-6 animate-fade-in">
@@ -597,8 +617,20 @@ const TeamAnalysisScreen: React.FC<TeamAnalysisScreenProps> = ({ appMode = 'CLAS
                                     </thead>
                                     <tbody className="font-mono">
                                         {sortedData.map((team) => (
-                                            <tr key={team.teamName} className="border-b border-slate-800 last:border-b-0 hover:bg-white/5 transition-colors">
-                                                <td className="p-4">
+                                            <tr
+                                                key={team.teamName}
+                                                className="border-b border-slate-800 last:border-b-0 hover:bg-white/5 transition-colors cursor-pointer"
+                                                title={`${team.teamName} 상세 보기`}
+                                                tabIndex={0}
+                                                onClick={() => setDetailTeam(team)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                        e.preventDefault();
+                                                        setDetailTeam(team);
+                                                    }
+                                                }}
+                                            >
+                                                <td className="p-4" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
                                                     <input 
                                                         type="checkbox"
                                                         checked={selectedTeamsForComparison.has(team.teamName)}

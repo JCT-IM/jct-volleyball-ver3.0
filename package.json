@@ -8,6 +8,8 @@
     "dev": "npm --prefix apps/volleyball run dev",
     "build": "npm --prefix apps/volleyball run build",
     "preview": "npm --prefix apps/volleyball run preview",
+    "test:team-detail": "node --experimental-strip-types --test apps/volleyball/tests/teamDetailStats.test.ts",
+    "test:hustle": "node --experimental-strip-types --test apps/volleyball/tests/hustleAssignment.test.ts",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "test:e2e": "corepack pnpm --dir packages/e2e-kit exec playwright test",
