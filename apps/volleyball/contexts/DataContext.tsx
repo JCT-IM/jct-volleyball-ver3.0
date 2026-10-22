@@ -5,6 +5,8 @@ import { BADGE_DEFINITIONS } from '../data/badges';
 import { translations } from '../data/translations';
 import localforage from 'localforage';
 import { getStorageKeys as buildStorageKeys } from '@jct/storage';
+import { UiProviders } from '@jct/ui';
+import { isAdminPasswordCorrect } from '../utils/adminPassword';
 import { filterProfanity } from '../utils/filterProfanity';
 import { hashToColor, ADMIN_CHAT_LABEL, ADMIN_CHAT_COLOR } from '../utils/chatUtils';
 import { extractYoutubeVideoId } from '../utils/extractYoutubeVideoId';
@@ -2985,7 +2987,13 @@ export const DataProvider = ({ children, appMode = 'CLASS' }: PropsWithChildren<
         setLanguage,
     };
 
-    return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
+    return (
+        <DataContext.Provider value={value}>
+            <UiProviders t={t} language={language} setLanguage={setLanguage} verifyAdminPassword={isAdminPasswordCorrect}>
+                {children}
+            </UiProviders>
+        </DataContext.Provider>
+    );
 };
 
 export const useData = () => {

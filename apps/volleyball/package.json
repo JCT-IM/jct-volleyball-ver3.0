@@ -11,6 +11,7 @@
   "dependencies": {
     "canvas-confetti": "^1.9.4",
     "@jct/storage": "workspace:*",
+    "@jct/ui": "workspace:*",
     "localforage": "^1.10.0",
     "peerjs": "^1.5.5",
     "qrcode.react": "^4.2.0",
