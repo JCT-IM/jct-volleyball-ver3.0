@@ -1,0 +1,1214 @@
+{
+  "settings": {
+    "winningScore": 3,
+    "includeBonusPointsInWinner": false,
+    "googleSheetUrl": "",
+    "tournamentTargetScore": 21,
+    "tournamentMaxSets": 3,
+    "volleyballRuleSystem": 6
+  },
+  "classTeamSets": [
+    {
+      "id": "set-class-1",
+      "className": "1반",
+      "savedAt": "2024-01-15T00:00:00.000Z",
+      "teams": [
+        {
+          "teamName": "청팀",
+          "captainId": "p1",
+          "playerIds": [
+            "p1",
+            "p2",
+            "p3",
+            "p4"
+          ],
+          "color": "#3b82f6",
+          "slogan": ""
+        },
+        {
+          "teamName": "백팀",
+          "captainId": "p5",
+          "playerIds": [
+            "p5",
+            "p6",
+            "p7",
+            "p8"
+          ],
+          "color": "#ef4444",
+          "slogan": ""
+        }
+      ],
+      "players": {
+        "p1": {
+          "id": "p1",
+          "originalName": "학생1",
+          "anonymousName": "학생1",
+          "class": "1반",
+          "studentNumber": "1",
+          "gender": "남",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": true,
+          "totalScore": 0
+        },
+        "p2": {
+          "id": "p2",
+          "originalName": "학생2",
+          "anonymousName": "학생2",
+          "class": "1반",
+          "studentNumber": "2",
+          "gender": "여",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p3": {
+          "id": "p3",
+          "originalName": "학생3",
+          "anonymousName": "학생3",
+          "class": "1반",
+          "studentNumber": "3",
+          "gender": "남",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p4": {
+          "id": "p4",
+          "originalName": "학생4",
+          "anonymousName": "학생4",
+          "class": "1반",
+          "studentNumber": "4",
+          "gender": "여",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p5": {
+          "id": "p5",
+          "originalName": "학생5",
+          "anonymousName": "학생5",
+          "class": "1반",
+          "studentNumber": "5",
+          "gender": "남",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": true,
+          "totalScore": 0
+        },
+        "p6": {
+          "id": "p6",
+          "originalName": "학생6",
+          "anonymousName": "학생6",
+          "class": "1반",
+          "studentNumber": "6",
+          "gender": "여",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p7": {
+          "id": "p7",
+          "originalName": "학생7",
+          "anonymousName": "학생7",
+          "class": "1반",
+          "studentNumber": "7",
+          "gender": "남",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p8": {
+          "id": "p8",
+          "originalName": "학생8",
+          "anonymousName": "학생8",
+          "class": "1반",
+          "studentNumber": "8",
+          "gender": "여",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        }
+      },
+      "teamCount": 2
+    }
+  ],
+  "classMatchHistory": [
+    {
+      "teamA": {
+        "name": "청팀",
+        "key": "set-class-1___청팀",
+        "color": "#3b82f6",
+        "score": 11,
+        "setsWon": 1,
+        "timeouts": 0,
+        "fairPlay": 0,
+        "threeHitPlays": 0,
+        "serviceAces": 0,
+        "serviceFaults": 0,
+        "blockingPoints": 0,
+        "spikeSuccesses": 11,
+        "players": {
+          "p1": {
+            "id": "p1",
+            "originalName": "학생1",
+            "anonymousName": "학생1",
+            "class": "1반",
+            "studentNumber": "1",
+            "gender": "남",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": true,
+            "totalScore": 0
+          },
+          "p2": {
+            "id": "p2",
+            "originalName": "학생2",
+            "anonymousName": "학생2",
+            "class": "1반",
+            "studentNumber": "2",
+            "gender": "여",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          },
+          "p3": {
+            "id": "p3",
+            "originalName": "학생3",
+            "anonymousName": "학생3",
+            "class": "1반",
+            "studentNumber": "3",
+            "gender": "남",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          },
+          "p4": {
+            "id": "p4",
+            "originalName": "학생4",
+            "anonymousName": "학생4",
+            "class": "1반",
+            "studentNumber": "4",
+            "gender": "여",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          }
+        },
+        "playerStats": {
+          "p1": {
+            "points": 11,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 11,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p2": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p3": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p4": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          }
+        },
+        "onCourtPlayerIds": [
+          "p1",
+          "p2",
+          "p3",
+          "p4"
+        ],
+        "benchPlayerIds": []
+      },
+      "teamB": {
+        "name": "백팀",
+        "key": "set-class-1___백팀",
+        "color": "#ef4444",
+        "score": 7,
+        "setsWon": 0,
+        "timeouts": 0,
+        "fairPlay": 0,
+        "threeHitPlays": 0,
+        "serviceAces": 0,
+        "serviceFaults": 0,
+        "blockingPoints": 0,
+        "spikeSuccesses": 7,
+        "players": {
+          "p5": {
+            "id": "p5",
+            "originalName": "학생5",
+            "anonymousName": "학생5",
+            "class": "1반",
+            "studentNumber": "5",
+            "gender": "남",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": true,
+            "totalScore": 0
+          },
+          "p6": {
+            "id": "p6",
+            "originalName": "학생6",
+            "anonymousName": "학생6",
+            "class": "1반",
+            "studentNumber": "6",
+            "gender": "여",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          },
+          "p7": {
+            "id": "p7",
+            "originalName": "학생7",
+            "anonymousName": "학생7",
+            "class": "1반",
+            "studentNumber": "7",
+            "gender": "남",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          },
+          "p8": {
+            "id": "p8",
+            "originalName": "학생8",
+            "anonymousName": "학생8",
+            "class": "1반",
+            "studentNumber": "8",
+            "gender": "여",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          }
+        },
+        "playerStats": {
+          "p5": {
+            "points": 7,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 7,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p6": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p7": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p8": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          }
+        },
+        "onCourtPlayerIds": [
+          "p5",
+          "p6",
+          "p7",
+          "p8"
+        ],
+        "benchPlayerIds": []
+      },
+      "servingTeam": null,
+      "currentSet": 1,
+      "maxSets": 1,
+      "isDeuce": false,
+      "gameOver": true,
+      "winner": "A",
+      "scoreHistory": [],
+      "eventHistory": [],
+      "scoreLocations": [],
+      "status": "completed",
+      "timeout": null,
+      "date": "2024-01-15T09:00:00.000Z",
+      "time": 120
+    }
+  ],
+  "clubTeamSets": [
+    {
+      "id": "set-club-1",
+      "className": "연습조",
+      "savedAt": "2024-01-15T00:00:00.000Z",
+      "teams": [
+        {
+          "teamName": "연습A",
+          "captainId": "p11",
+          "playerIds": [
+            "p11",
+            "p12",
+            "p13",
+            "p14",
+            "p15",
+            "p16"
+          ],
+          "color": "#f59e0b",
+          "slogan": ""
+        },
+        {
+          "teamName": "연습B",
+          "captainId": "p17",
+          "playerIds": [
+            "p17",
+            "p18",
+            "p19",
+            "p20",
+            "p21",
+            "p22"
+          ],
+          "color": "#8b5cf6",
+          "slogan": ""
+        }
+      ],
+      "players": {
+        "p11": {
+          "id": "p11",
+          "originalName": "학생11",
+          "anonymousName": "학생11",
+          "class": "연습조",
+          "studentNumber": "11",
+          "gender": "남",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": true,
+          "totalScore": 0
+        },
+        "p12": {
+          "id": "p12",
+          "originalName": "학생12",
+          "anonymousName": "학생12",
+          "class": "연습조",
+          "studentNumber": "12",
+          "gender": "여",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p13": {
+          "id": "p13",
+          "originalName": "학생13",
+          "anonymousName": "학생13",
+          "class": "연습조",
+          "studentNumber": "13",
+          "gender": "남",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p14": {
+          "id": "p14",
+          "originalName": "학생14",
+          "anonymousName": "학생14",
+          "class": "연습조",
+          "studentNumber": "14",
+          "gender": "여",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p15": {
+          "id": "p15",
+          "originalName": "학생15",
+          "anonymousName": "학생15",
+          "class": "연습조",
+          "studentNumber": "15",
+          "gender": "남",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p16": {
+          "id": "p16",
+          "originalName": "학생16",
+          "anonymousName": "학생16",
+          "class": "연습조",
+          "studentNumber": "16",
+          "gender": "여",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p17": {
+          "id": "p17",
+          "originalName": "학생17",
+          "anonymousName": "학생17",
+          "class": "연습조",
+          "studentNumber": "17",
+          "gender": "남",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": true,
+          "totalScore": 0
+        },
+        "p18": {
+          "id": "p18",
+          "originalName": "학생18",
+          "anonymousName": "학생18",
+          "class": "연습조",
+          "studentNumber": "18",
+          "gender": "여",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p19": {
+          "id": "p19",
+          "originalName": "학생19",
+          "anonymousName": "학생19",
+          "class": "연습조",
+          "studentNumber": "19",
+          "gender": "남",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p20": {
+          "id": "p20",
+          "originalName": "학생20",
+          "anonymousName": "학생20",
+          "class": "연습조",
+          "studentNumber": "20",
+          "gender": "여",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p21": {
+          "id": "p21",
+          "originalName": "학생21",
+          "anonymousName": "학생21",
+          "class": "연습조",
+          "studentNumber": "21",
+          "gender": "남",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        },
+        "p22": {
+          "id": "p22",
+          "originalName": "학생22",
+          "anonymousName": "학생22",
+          "class": "연습조",
+          "studentNumber": "22",
+          "gender": "여",
+          "stats": {
+            "height": 170,
+            "shuttleRun": 10,
+            "flexibility": 20,
+            "fiftyMeterDash": 8,
+            "underhand": 5,
+            "serve": 5
+          },
+          "isCaptain": false,
+          "totalScore": 0
+        }
+      },
+      "teamCount": 2
+    }
+  ],
+  "clubMatchHistory": [],
+  "clubPracticeMatchHistory": [
+    {
+      "teamA": {
+        "name": "연습A",
+        "key": "set-club-1___연습A",
+        "color": "#f59e0b",
+        "score": 15,
+        "setsWon": 1,
+        "timeouts": 0,
+        "fairPlay": 0,
+        "threeHitPlays": 0,
+        "serviceAces": 0,
+        "serviceFaults": 0,
+        "blockingPoints": 0,
+        "spikeSuccesses": 15,
+        "players": {
+          "p11": {
+            "id": "p11",
+            "originalName": "학생11",
+            "anonymousName": "학생11",
+            "class": "연습조",
+            "studentNumber": "11",
+            "gender": "남",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": true,
+            "totalScore": 0
+          },
+          "p12": {
+            "id": "p12",
+            "originalName": "학생12",
+            "anonymousName": "학생12",
+            "class": "연습조",
+            "studentNumber": "12",
+            "gender": "여",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          },
+          "p13": {
+            "id": "p13",
+            "originalName": "학생13",
+            "anonymousName": "학생13",
+            "class": "연습조",
+            "studentNumber": "13",
+            "gender": "남",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          },
+          "p14": {
+            "id": "p14",
+            "originalName": "학생14",
+            "anonymousName": "학생14",
+            "class": "연습조",
+            "studentNumber": "14",
+            "gender": "여",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          },
+          "p15": {
+            "id": "p15",
+            "originalName": "학생15",
+            "anonymousName": "학생15",
+            "class": "연습조",
+            "studentNumber": "15",
+            "gender": "남",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          },
+          "p16": {
+            "id": "p16",
+            "originalName": "학생16",
+            "anonymousName": "학생16",
+            "class": "연습조",
+            "studentNumber": "16",
+            "gender": "여",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          }
+        },
+        "playerStats": {
+          "p11": {
+            "points": 15,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 15,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p12": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p13": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p14": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p15": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p16": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          }
+        },
+        "onCourtPlayerIds": [
+          "p11",
+          "p12",
+          "p13",
+          "p14",
+          "p15",
+          "p16"
+        ],
+        "benchPlayerIds": []
+      },
+      "teamB": {
+        "name": "연습B",
+        "key": "set-club-1___연습B",
+        "color": "#8b5cf6",
+        "score": 10,
+        "setsWon": 0,
+        "timeouts": 0,
+        "fairPlay": 0,
+        "threeHitPlays": 0,
+        "serviceAces": 0,
+        "serviceFaults": 0,
+        "blockingPoints": 0,
+        "spikeSuccesses": 10,
+        "players": {
+          "p17": {
+            "id": "p17",
+            "originalName": "학생17",
+            "anonymousName": "학생17",
+            "class": "연습조",
+            "studentNumber": "17",
+            "gender": "남",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": true,
+            "totalScore": 0
+          },
+          "p18": {
+            "id": "p18",
+            "originalName": "학생18",
+            "anonymousName": "학생18",
+            "class": "연습조",
+            "studentNumber": "18",
+            "gender": "여",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          },
+          "p19": {
+            "id": "p19",
+            "originalName": "학생19",
+            "anonymousName": "학생19",
+            "class": "연습조",
+            "studentNumber": "19",
+            "gender": "남",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          },
+          "p20": {
+            "id": "p20",
+            "originalName": "학생20",
+            "anonymousName": "학생20",
+            "class": "연습조",
+            "studentNumber": "20",
+            "gender": "여",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          },
+          "p21": {
+            "id": "p21",
+            "originalName": "학생21",
+            "anonymousName": "학생21",
+            "class": "연습조",
+            "studentNumber": "21",
+            "gender": "남",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          },
+          "p22": {
+            "id": "p22",
+            "originalName": "학생22",
+            "anonymousName": "학생22",
+            "class": "연습조",
+            "studentNumber": "22",
+            "gender": "여",
+            "stats": {
+              "height": 170,
+              "shuttleRun": 10,
+              "flexibility": 20,
+              "fiftyMeterDash": 8,
+              "underhand": 5,
+              "serve": 5
+            },
+            "isCaptain": false,
+            "totalScore": 0
+          }
+        },
+        "playerStats": {
+          "p17": {
+            "points": 10,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 10,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p18": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p19": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p20": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p21": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          },
+          "p22": {
+            "points": 0,
+            "serviceAces": 0,
+            "serviceFaults": 0,
+            "blockingPoints": 0,
+            "spikeSuccesses": 0,
+            "serveIn": 0,
+            "digs": 0,
+            "assists": 0
+          }
+        },
+        "onCourtPlayerIds": [
+          "p17",
+          "p18",
+          "p19",
+          "p20",
+          "p21",
+          "p22"
+        ],
+        "benchPlayerIds": []
+      },
+      "servingTeam": null,
+      "currentSet": 1,
+      "maxSets": 1,
+      "isDeuce": false,
+      "gameOver": true,
+      "winner": "A",
+      "scoreHistory": [],
+      "eventHistory": [],
+      "scoreLocations": [],
+      "status": "completed",
+      "timeout": null,
+      "date": "2024-02-01T09:00:00.000Z",
+      "time": 120,
+      "matchType": "practice"
+    }
+  ],
+  "leakedTeamSet": {
+    "id": "set-leaked",
+    "className": "1player_records_class_suffix",
+    "savedAt": "2024-01-15T00:00:00.000Z",
+    "teams": [
+      {
+        "teamName": "키확인팀",
+        "captainId": "p31",
+        "playerIds": [
+          "p31",
+          "p32"
+        ],
+        "color": "#22c55e",
+        "slogan": ""
+      }
+    ],
+    "players": {
+      "p31": {
+        "id": "p31",
+        "originalName": "학생31",
+        "anonymousName": "학생31",
+        "class": "1player_records_class_suffix",
+        "studentNumber": "31",
+        "gender": "남",
+        "stats": {
+          "height": 170,
+          "shuttleRun": 10,
+          "flexibility": 20,
+          "fiftyMeterDash": 8,
+          "underhand": 5,
+          "serve": 5
+        },
+        "isCaptain": true,
+        "totalScore": 0
+      },
+      "p32": {
+        "id": "p32",
+        "originalName": "학생32",
+        "anonymousName": "학생32",
+        "class": "1player_records_class_suffix",
+        "studentNumber": "32",
+        "gender": "여",
+        "stats": {
+          "height": 170,
+          "shuttleRun": 10,
+          "flexibility": 20,
+          "fiftyMeterDash": 8,
+          "underhand": 5,
+          "serve": 5
+        },
+        "isCaptain": false,
+        "totalScore": 0
+      }
+    },
+    "teamCount": 1
+  },
+  "jiveTeams": [
+    {
+      "id": "jive-1",
+      "name": "학생41"
+    }
+  ],
+  "jiveMatchHistory": [
+    {
+      "id": "jive-m1",
+      "label": "학생41"
+    }
+  ]
+}

@@ -9,7 +9,9 @@
     "build": "npm --prefix apps/volleyball run build",
     "preview": "npm --prefix apps/volleyball run preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "test:e2e": "corepack pnpm --dir packages/e2e-kit exec playwright test",
+    "test:e2e:update": "corepack pnpm --dir packages/e2e-kit exec playwright test --update-snapshots"
   },
   "devDependencies": {
     "gh-pages": "^6.1.1"
