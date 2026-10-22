@@ -4,26 +4,13 @@
  * 보안: 로드 후에도 로그인 상태로 전환하지 않음 - 사용자는 비밀번호 입력 필요.
  */
 import localforage from 'localforage';
+import { getStorageKeys as buildStorageKeys } from '@jct/storage';
 
 const SETTINGS_KEY = 'jct_volleyball_settings';
 
 function getStorageKeys(appMode: 'CLASS' | 'CLUB') {
-    const p = appMode === 'CLUB' ? 'club_' : 'class_';
-    return {
-        TEAM_SETS_KEY: p + 'jct_volleyball_team_sets',
-        MATCH_HISTORY_KEY: p + 'jct_volleyball_match_history',
-        USER_EMBLEMS_KEY: p + 'jct_volleyball_user_emblems',
-        ACHIEVEMENTS_KEY: p + 'jct_volleyball_achievements',
-        TOURNAMENTS_KEY: p + 'jct_volleyball_tournaments',
-        LEAGUES_KEY: p + 'jct_volleyball_leagues',
-        COACHING_LOGS_KEY: p + 'jct_volleyball_coaching_logs',
-        BACKUP_KEY: p + 'jct_volleyball_backup_autosave',
-        OPPONENT_TEAMS_KEY: p + 'jct_volleyball_opponent_teams',
-        LEAGUE_STANDINGS_KEY: p + 'jct_volleyball_league_standings',
-        LEAGUE_STANDINGS_LIST_KEY: p + 'jct_volleyball_league_standings_list',
-        PRACTICE_MATCH_HISTORY_KEY: p + 'jct_volleyball_practice_match_history',
-        LEAGUE_MATCH_HISTORY_KEY: p + 'jct_volleyball_league_match_history',
-    };
+    const sportPrefix = appMode === 'CLUB' ? 'club_jct_volleyball_' : 'class_jct_volleyball_';
+    return buildStorageKeys(sportPrefix);
 }
 
 export async function loadBackupFromFile(file: File): Promise<{ ok: boolean; error?: string }> {

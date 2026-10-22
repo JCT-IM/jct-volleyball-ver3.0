@@ -4,6 +4,7 @@ import { MatchState, TeamSet, TeamMatchState, Player, PlayerStats, Action, UserE
 import { BADGE_DEFINITIONS } from '../data/badges';
 import { translations } from '../data/translations';
 import localforage from 'localforage';
+import { getStorageKeys as buildStorageKeys } from '@jct/storage';
 import { filterProfanity } from '../utils/filterProfanity';
 import { hashToColor, ADMIN_CHAT_LABEL, ADMIN_CHAT_COLOR } from '../utils/chatUtils';
 import { extractYoutubeVideoId } from '../utils/extractYoutubeVideoId';
@@ -25,23 +26,8 @@ const SETTINGS_KEY = 'jct_volleyball_settings';
 const LANGUAGE_KEY = 'jct_volleyball_language';
 
 function getStorageKeys(appMode: 'CLASS' | 'CLUB') {
-    const p = appMode === 'CLUB' ? 'club_' : 'class_';
-    return {
-        TEAM_SETS_KEY: p + 'jct_volleyball_team_sets',
-        MATCH_HISTORY_KEY: p + 'jct_volleyball_match_history',
-        USER_EMBLEMS_KEY: p + 'jct_volleyball_user_emblems',
-        ACHIEVEMENTS_KEY: p + 'jct_volleyball_achievements',
-        TOURNAMENTS_KEY: p + 'jct_volleyball_tournaments',
-        LEAGUES_KEY: p + 'jct_volleyball_leagues',
-        COACHING_LOGS_KEY: p + 'jct_volleyball_coaching_logs',
-        BACKUP_KEY: p + 'jct_volleyball_backup_autosave',
-        OPPONENT_TEAMS_KEY: p + 'jct_volleyball_opponent_teams',
-        LEAGUE_STANDINGS_KEY: p + 'jct_volleyball_league_standings',
-        LEAGUE_STANDINGS_LIST_KEY: p + 'jct_volleyball_league_standings_list',
-        PRACTICE_MATCH_HISTORY_KEY: p + 'jct_volleyball_practice_match_history',
-        LEAGUE_MATCH_HISTORY_KEY: p + 'jct_volleyball_league_match_history',
-        SCHEDULED_BROADCASTS_KEY: p + 'jct_volleyball_scheduled_matches',
-    };
+    const sportPrefix = appMode === 'CLUB' ? 'club_jct_volleyball_' : 'class_jct_volleyball_';
+    return buildStorageKeys(sportPrefix);
 }
 const TEAM_COLORS_PALETTE = ['#3b82f6', '#ef4444', '#22c55e', '#eab308', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#64748b', '#f472b6', '#06b6d4', '#f59e0b'];
 
