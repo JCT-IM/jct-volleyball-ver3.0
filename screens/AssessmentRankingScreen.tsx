@@ -2,6 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useData } from '../contexts/DataContext';
 import { Player, PlayerCumulativeStats, TeamSet } from '../types';
 import { useTranslation } from '../hooks/useTranslation';
+import { collectHustlePlayerIds } from '../utils/hustleAssignment';
 
 type TabType = 'excellence' | 'effort';
 
@@ -96,16 +97,11 @@ export const AssessmentRankingScreen: React.FC<AssessmentRankingScreenProps> = (
     /** 필터된 경기에서만 계산한 노력상 횟수 (누적 합산) */
     const filteredHustleCountByPlayerId = useMemo(() => {
         const count = new Map<string, number>();
-        filteredMatchHistory
-            .filter((m: MatchWithHustle) => m.isAssessment)
-            .forEach(match => {
-                const ids = (match as MatchWithHustle).hustlePlayerIds?.length
-                    ? (match as MatchWithHustle).hustlePlayerIds!
-                    : ((match as MatchWithHustle).hustlePlayers ?? []).map(p => p.id);
-                ids.forEach(pid => {
-                    count.set(pid, (count.get(pid) ?? 0) + 1);
-                });
+        filteredMatchHistory.forEach(match => {
+            collectHustlePlayerIds(match).forEach(pid => {
+                count.set(pid, (count.get(pid) ?? 0) + 1);
             });
+        });
         return count;
     }, [filteredMatchHistory]);
 

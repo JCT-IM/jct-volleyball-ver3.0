@@ -10,6 +10,8 @@ import TeamEmblem from '../components/TeamEmblem';
 import { generateMatchResultImage } from '../utils/canvasUtils';
 import { useTranslation } from '../hooks/useTranslation';
 import { buildSetScopedMatchView, buildSetScoreTrendFromEvents, type ScoreTrendPoint } from '../utils/clubSetStats';
+import { RetroactiveHustleModal } from '../components/RetroactiveHustleModal';
+import { applyRetroactiveHustle, collectHustlePlayerIds, formatHustleTimestamp } from '../utils/hustleAssignment';
 
 interface RecordScreenProps {
     appMode?: 'CLASS' | 'CLUB';
@@ -351,7 +353,7 @@ const ScoreTrendChart: React.FC<{
 };
 
 const RecordScreen: React.FC<RecordScreenProps> = ({ appMode = 'CLASS', onContinueGame, preselectedMatchId, onClearPreselection }) => {
-    const { teamSets, matchHistory, practiceMatchHistory, leagueMatchHistory, matchState, matchTime, saveMatchHistory, savePracticeMatchHistory, saveLeagueMatchHistory, clearInProgressMatch, showToast, userEmblems, settings, language, leagueStandingsList, saveLeagueStandingsList, playerCumulativeStats } = useData();
+    const { teamSets, matchHistory, practiceMatchHistory, leagueMatchHistory, matchState, matchTime, saveMatchHistory, savePracticeMatchHistory, saveLeagueMatchHistory, clearInProgressMatch, showToast, userEmblems, settings, language, leagueStandingsList, saveLeagueStandingsList, playerCumulativeStats, p2p, requestPassword } = useData();
     const { t } = useTranslation();
     const [selectedMatch, setSelectedMatch] = useState<EnrichedMatch | null>(null);
     const [selectedClass, setSelectedClass] = useState<string>('');
@@ -363,6 +365,8 @@ const RecordScreen: React.FC<RecordScreenProps> = ({ appMode = 'CLASS', onContin
     const [setDetailTab, setSetDetailTab] = useState<0 | 1 | 2 | 'all'>('all');
     const [showRankingsModal, setShowRankingsModal] = useState(false);
     const [showScoreTrend, setShowScoreTrend] = useState(false);
+    const [hustleEditMatch, setHustleEditMatch] = useState<EnrichedMatch | null>(null);
+    const isStudentViewer = p2p.isConnected && !p2p.isHost;
     const [playerHistoryData, setPlayerHistoryData] = useState<{
         player: Player;
         cumulativeStats: any;
@@ -1035,6 +1039,61 @@ const RecordScreen: React.FC<RecordScreenProps> = ({ appMode = 'CLASS', onContin
         }
     };
 
+    const openHustleEditor = (match: EnrichedMatch) => {
+        if (isStudentViewer || match.status !== 'completed') return;
+        requestPassword(() => setHustleEditMatch(match));
+    };
+
+    const handleSaveRetroactiveHustle = async (playerId: string, markAsAssessment: boolean) => {
+        const editing = hustleEditMatch;
+        if (!editing || isStudentViewer || editing.status !== 'completed') return;
+
+        const stored = (() => {
+            if (editing.id.startsWith('history-')) {
+                const index = Number(editing.id.slice('history-'.length));
+                const raw = matchHistory[index];
+                return raw ? { kind: 'class' as const, index, raw, list: matchHistory } : null;
+            }
+            if (editing.id.startsWith('practice-')) {
+                const index = Number(editing.id.slice('practice-'.length));
+                const raw = practiceMatchHistory[index];
+                return raw ? { kind: 'practice' as const, index, raw, list: practiceMatchHistory } : null;
+            }
+            if (editing.id.startsWith('league-')) {
+                const index = Number(editing.id.slice('league-'.length));
+                const raw = leagueMatchHistory[index];
+                return raw ? { kind: 'league' as const, index, raw, list: leagueMatchHistory } : null;
+            }
+            return null;
+        })();
+
+        if (!stored) {
+            showToast('이 경기 기록을 찾지 못했습니다.', 'error');
+            return;
+        }
+
+        const next = applyRetroactiveHustle(stored.raw, playerId, { markAsAssessment });
+        if (!next) {
+            showToast('출전 선수만 허슬 플레이어로 지정할 수 있습니다.', 'error');
+            return;
+        }
+
+        const list = [...stored.list];
+        list[stored.index] = next;
+        const message = '허슬 플레이어를 저장했습니다.';
+        if (stored.kind === 'class') await saveMatchHistory(list, message);
+        else if (stored.kind === 'practice') await savePracticeMatchHistory(list, message);
+        else await saveLeagueMatchHistory(list, message);
+
+        setSelectedMatch({
+            ...next,
+            id: editing.id,
+            status: 'completed',
+            date: next.date ?? editing.date,
+        });
+        setHustleEditMatch(null);
+    };
+
     const handleExportCSV = () => {
         if (filteredMatches.length === 0) return;
 
@@ -1356,6 +1415,7 @@ const RecordScreen: React.FC<RecordScreenProps> = ({ appMode = 'CLASS', onContin
                                 const teamBEmblem = teamBInfo?.emblem || match.teamB.emblem;
 
                                 const isAssessment = (match as MatchState & { isAssessment?: boolean }).isAssessment;
+                                const hustleRetroactive = match.hustleRetroactive === true;
                                 return (
                                 <div
                                     key={match.id}
@@ -1370,6 +1430,11 @@ const RecordScreen: React.FC<RecordScreenProps> = ({ appMode = 'CLASS', onContin
                                             {isAssessment && (
                                                 <span className="inline-flex items-center gap-1 text-xs font-semibold bg-amber-500/30 text-amber-200 px-2 py-0.5 rounded border border-amber-500/50">
                                                     🎯 수행평가
+                                                </span>
+                                            )}
+                                            {hustleRetroactive && (
+                                                <span className="inline-flex items-center text-xs font-semibold bg-sky-500/20 text-sky-200 px-2 py-0.5 rounded border border-sky-400/40">
+                                                    사후 입력
                                                 </span>
                                             )}
                                         </div>
@@ -1401,6 +1466,14 @@ const RecordScreen: React.FC<RecordScreenProps> = ({ appMode = 'CLASS', onContin
                                                 {t('record_continue_game')}
                                             </button>
                                         )}
+                                        {!isStudentViewer && match.status === 'completed' && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); openHustleEditor(match); }}
+                                                className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-1 px-3 rounded-md text-sm transition"
+                                            >
+                                                {collectHustlePlayerIds(match).length > 0 ? '허슬 수정' : '허슬 지정'}
+                                            </button>
+                                        )}
                                         <button onClick={(e) => { e.stopPropagation(); handleDelete(match.id); }} className="text-slate-500 hover:text-red-500 font-bold text-xl flex items-center justify-center w-6 h-6 rounded-full hover:bg-slate-700" aria-label={t('record_delete_record')}>&times;</button>
                                     </div>
                                 </div>
@@ -1419,41 +1492,12 @@ const RecordScreen: React.FC<RecordScreenProps> = ({ appMode = 'CLASS', onContin
                     
                     {enrichedSelectedMatch ? (
                         <div className="space-y-6 pt-6 border-t border-slate-700 animate-fade-in printable-area">
-                            {(enrichedSelectedMatch as EnrichedMatch & { isAssessment?: boolean }).isAssessment && (
-                                <>
-                                    <div className="rounded-xl overflow-hidden border-2 border-amber-500/60 bg-amber-600/90 no-print">
-                                        <div className="px-5 py-4 flex items-center gap-3">
-                                            <span className="text-2xl">🎯</span>
-                                            <h2 className="text-xl font-bold text-amber-950">수행평가 매치</h2>
-                                        </div>
-                                    </div>
-                                    {(() => {
-                                        const match = enrichedSelectedMatch as EnrichedMatch & { hustlePlayers?: { id: string; name: string; team: 'A' | 'B' }[]; hustlePlayerIds?: string[] };
-                                        const list = match.hustlePlayers?.length
-                                            ? match.hustlePlayers
-                                            : (match.hustlePlayerIds ?? []).map(pid => {
-                                                const inA = match.teamA?.players?.[pid];
-                                                const inB = match.teamB?.players?.[pid];
-                                                const p = inA ?? inB;
-                                                return { id: pid, name: p?.originalName ?? '선수', team: (inA ? 'A' : 'B') as 'A' | 'B' };
-                                              });
-                                        if (list.length === 0) return null;
-                                        return (
-                                            <div className="rounded-xl border-2 border-amber-500/40 bg-amber-900/30 p-4 no-print">
-                                                <h3 className="text-sm font-bold text-amber-400 mb-2">🔥 오늘의 허슬 플레이어</h3>
-                                                <p className="text-slate-200 font-medium">
-                                                    {list.map((hp, i) => (
-                                                        <span key={hp.id}>
-                                                            {i > 0 && ', '}
-                                                            <span className="text-amber-200">{hp.name}</span>
-                                                            <span className="text-slate-500 text-sm ml-1">({hp.team === 'A' ? enrichedSelectedMatch.teamA.name : enrichedSelectedMatch.teamB.name})</span>
-                                                        </span>
-                                                    ))}
-                                                </p>
-                                            </div>
-                                        );
-                                    })()}
-                                </>
+                            {(enrichedSelectedMatch.isAssessment || enrichedSelectedMatch.status === 'completed') && (
+                                <HustleRecordPanel
+                                    match={enrichedSelectedMatch}
+                                    canEdit={!isStudentViewer && enrichedSelectedMatch.status === 'completed'}
+                                    onEdit={() => openHustleEditor(enrichedSelectedMatch)}
+                                />
                             )}
                              <div className="printable-header hidden print:flex">
                                 <h1 className="printable-title">J-IVE 경기 분석 리포트</h1>
@@ -1710,8 +1754,94 @@ const RecordScreen: React.FC<RecordScreenProps> = ({ appMode = 'CLASS', onContin
                     )}
                 </div>
             </div>
+            <RetroactiveHustleModal
+                isOpen={!isStudentViewer && hustleEditMatch != null}
+                match={hustleEditMatch}
+                onClose={() => setHustleEditMatch(null)}
+                onSave={handleSaveRetroactiveHustle}
+            />
         </>
     );
 };
+
+function HustleRecordPanel({ match, canEdit, onEdit }: { match: EnrichedMatch; canEdit: boolean; onEdit: () => void }) {
+    const ids = collectHustlePlayerIds(match);
+    const list = match.hustlePlayers?.length
+        ? match.hustlePlayers
+        : ids.map(playerId => {
+            const inA = match.teamA?.players?.[playerId];
+            const inB = match.teamB?.players?.[playerId];
+            const player = inA ?? inB;
+            return { id: playerId, name: player?.originalName ?? '선수', team: (inA ? 'A' : 'B') as 'A' | 'B' };
+        });
+    const updatedAt = formatHustleTimestamp(match.hustleUpdatedAt);
+    const hasSelection = list.length > 0;
+
+    return (
+        <div className="space-y-3 no-print">
+            {match.isAssessment && (
+                <div className="rounded-xl overflow-hidden border-2 border-amber-500/60 bg-amber-600/90">
+                    <div className="px-5 py-4 flex items-center gap-3">
+                        <span className="text-2xl">🎯</span>
+                        <h2 className="text-xl font-bold text-amber-950">수행평가 매치</h2>
+                    </div>
+                </div>
+            )}
+            <div className="rounded-xl border-2 border-amber-500/40 bg-amber-900/30 p-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h3 className="text-sm font-bold text-amber-400">🔥 오늘의 허슬 플레이어</h3>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {match.hustleRetroactive && (
+                            <span className="text-xs font-semibold bg-sky-500/20 text-sky-200 px-2 py-0.5 rounded border border-sky-400/40">사후 입력</span>
+                        )}
+                        {updatedAt && <span className="text-xs text-slate-400">{updatedAt}</span>}
+                        {canEdit && (
+                            <button type="button" onClick={onEdit} className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-1.5 px-3 rounded-md text-sm transition">
+                                {hasSelection ? '허슬 플레이어 수정' : '허슬 플레이어 지정'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+                {hasSelection ? (
+                    <p className="text-slate-200 font-medium">
+                        {list.map((hp, index) => (
+                            <span key={hp.id}>
+                                {index > 0 && ', '}
+                                <span className="text-amber-200">{hp.name}</span>
+                                <span className="text-slate-500 text-sm ml-1">({hp.team === 'A' ? match.teamA.name : match.teamB.name})</span>
+                            </span>
+                        ))}
+                    </p>
+                ) : (
+                    <p className="text-sm text-slate-400">아직 지정되지 않았습니다.</p>
+                )}
+                {(match.hustleHistory?.length ?? 0) > 0 && (
+                    <ul className="text-xs text-slate-400 space-y-1 border-t border-amber-500/20 pt-2">
+                        {match.hustleHistory!.map((revision, index) => (
+                            <li key={`${revision.at}-${index}`}>
+                                이전: {revision.players.map(player => player.name).join(', ') || '미지정'}
+                                {' · '}
+                                {formatHustleTimestamp(revision.at)}
+                                {' · '}
+                                {revision.source === 'retroactive' ? '사후 입력' : '경기 종료 시'}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                {(match.assessmentFlagHistory?.length ?? 0) > 0 && (
+                    <ul className="text-xs text-slate-400 space-y-1">
+                        {match.assessmentFlagHistory!.map((revision, index) => (
+                            <li key={`${revision.at}-${index}`}>
+                                유형 변경: {revision.from ? '수행평가' : '일반'} → {revision.to ? '수행평가' : '일반'}
+                                {' · '}
+                                {formatHustleTimestamp(revision.at)}
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
+        </div>
+    );
+}
 
 export default RecordScreen;

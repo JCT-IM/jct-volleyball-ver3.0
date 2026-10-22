@@ -26,6 +26,7 @@ export default function MatchSetupScreen({ appMode = 'CLASS', onStartMatch }: Ma
     const [selectedTeamBKey, setSelectedTeamBKey] = useState('');
     const [modalState, setModalState] = useState<{ isOpen: boolean; target: 'A' | 'B' | null }>({ isOpen: false, target: null });
     const [isAssessmentMode, setIsAssessmentMode] = useState(false);
+    const [assessmentPromptOpen, setAssessmentPromptOpen] = useState(false);
     const [prediction, setPrediction] = useState<{ a: number, b: number } | null>(null);
     const [showPrediction, setShowPrediction] = useState(false);
 
@@ -93,19 +94,28 @@ export default function MatchSetupScreen({ appMode = 'CLASS', onStartMatch }: Ma
         setModalState({ isOpen: false, target: null });
     };
 
+    const proceedToAttendance = (assessment: boolean) => {
+        if (!teamA || !teamB) return;
+        onStartMatch({
+            teamA: teamA.teamName,
+            teamB: teamB.teamName,
+            teamAKey: teamA.key,
+            teamBKey: teamB.key,
+            ...(appMode === 'CLASS' ? { isAssessmentMode: assessment } : {}),
+        });
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!teamA || !hasTeamB) {
             showToast(t('toast_select_both_teams'), 'error');
             return;
         }
-        onStartMatch({
-            teamA: teamA.teamName,
-            teamB: teamB!.teamName,
-            teamAKey: teamA.key,
-            teamBKey: teamB!.key,
-            ...(appMode === 'CLASS' ? { isAssessmentMode } : {}),
-        });
+        if (appMode === 'CLASS' && !isAssessmentMode) {
+            setAssessmentPromptOpen(true);
+            return;
+        }
+        proceedToAttendance(isAssessmentMode);
     };
 
     const TeamDisplayCard: React.FC<{ team: FlattenedTeam, onSelect: () => void, colorClass: string }> = ({ team, onSelect, colorClass }) => (
@@ -133,6 +143,50 @@ export default function MatchSetupScreen({ appMode = 'CLASS', onStartMatch }: Ma
                 excludeKey={modalState.target === 'A' ? selectedTeamBKey : selectedTeamAKey}
                 baseTeamKey={modalState.target === 'B' ? selectedTeamAKey : undefined}
             />
+            {assessmentPromptOpen && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4"
+                    onClick={() => setAssessmentPromptOpen(false)}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="assessment-confirm-title"
+                >
+                    <div className="bg-slate-900 rounded-lg shadow-2xl p-6 w-full max-w-md text-white border border-amber-500/50" onClick={event => event.stopPropagation()}>
+                        <h2 id="assessment-confirm-title" className="text-2xl font-bold text-amber-400 mb-3">수행평가 경기인가요?</h2>
+                        <p className="text-slate-300">수행평가 모드를 켜지 않고 시작하려고 합니다. 수행평가라면 지금 켜 주세요. 수행평가 경기는 종료할 때 허슬 플레이어를 고릅니다.</p>
+                        <div className="flex flex-col gap-2 mt-6">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsAssessmentMode(true);
+                                    setAssessmentPromptOpen(false);
+                                    proceedToAttendance(true);
+                                }}
+                                className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-lg"
+                            >
+                                예, 수행평가로 시작
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setAssessmentPromptOpen(false);
+                                    proceedToAttendance(false);
+                                }}
+                                className="bg-slate-600 hover:bg-slate-500 text-white font-bold py-3 px-4 rounded-lg"
+                            >
+                                아니요, 일반 경기로 시작
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setAssessmentPromptOpen(false)}
+                                className="text-slate-400 hover:text-slate-200 font-semibold py-2"
+                            >
+                                취소
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="max-w-4xl mx-auto bg-slate-900/50 backdrop-blur-sm border border-slate-700 p-4 sm:p-6 rounded-lg shadow-2xl space-y-4 sm:space-y-6 animate-fade-in px-4">
                  {appMode === 'CLASS' && (
                     <div className="p-4 sm:p-5 bg-amber-900/20 rounded-lg border-2 border-amber-500/50">
