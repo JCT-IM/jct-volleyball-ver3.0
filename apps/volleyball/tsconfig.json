@@ -15,6 +15,6 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src", "components", "contexts", "screens", "utils"],
+  "include": ["src", "components", "contexts", "screens", "utils", "sport.ts"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

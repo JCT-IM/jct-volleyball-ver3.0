@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",
+    "@jct/sport-core": "workspace:*",
     "@jct/storage": "workspace:*",
     "@jct/ui": "workspace:*",
     "localforage": "^1.10.0",
