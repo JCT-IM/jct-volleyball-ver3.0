@@ -39,6 +39,9 @@ export async function goToAttendance(page: Page, mode: 'class' | 'club') {
     await chooseTeam(page, 'B팀 선택', '1반', '백팀');
   }
   await page.getByRole('button', { name: '출전 선수 선택으로 이동' }).click();
+  if (mode === 'class') {
+    await page.getByRole('button', { name: '아니요, 일반 경기로 시작' }).click();
+  }
   await expect(page.getByRole('heading', { name: '출전 선수 선택', exact: true })).toBeVisible();
 }
 

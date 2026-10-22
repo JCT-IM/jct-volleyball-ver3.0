@@ -96,6 +96,26 @@ test('수업과 클럽을 오가도 모드 데이터가 섞이지 않는다', as
   await expect(page.getByText(/11\s*:\s*7/)).toHaveCount(0);
 });
 
+test('팀 상세 모달에서 경기별 추이 차트가 보인다', async ({ page }) => {
+  await openClass(page);
+  await page.goto('/class/team-analysis');
+  await page.getByTitle('청팀 상세 보기').click();
+  await expect(page.getByRole('heading', { name: '청팀', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '경기별 추이' })).toBeVisible();
+  await expect(page.locator('.recharts-wrapper').first()).toBeVisible();
+});
+
+test('소급 노력상 모달이 열린다', async ({ page }) => {
+  await openClass(page);
+  await page.goto('/class/history');
+  await page.getByRole('button', { name: '허슬 지정' }).click();
+  const password = page.getByRole('dialog', { name: '비밀번호 확인' });
+  await password.getByPlaceholder('비밀번호 입력').fill('0819');
+  await password.getByRole('button', { name: '확인', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '허슬 플레이어 지정/수정' })).toBeVisible();
+  await expect(page.getByText('학생1').first()).toBeVisible();
+});
+
 test('팀 관리 반 이름에 내부 키가 보이지 않는다', async ({ page }) => {
   await openClass(page, { includeLeaked: true });
   await page.goto('/class/team-management');
