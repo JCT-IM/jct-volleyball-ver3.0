@@ -65,6 +65,11 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ appMode = '
     const { teamSets, saveTeamSets, deleteTeam, createTeamSet, deleteTeamSet, addTeamToSet, copyTeamFromOtherSet, teamSetsMap, removePlayerFromTeam, addPlayerToTeam, setTeamCaptain } = useData();
     const isClub = appMode === 'CLUB';
     const { t } = useTranslation();
+    const displayClassName = (className: string) => {
+        const leaked = /^(\d+)player_records_class_suffix$/.exec(className);
+        if (!leaked) return className;
+        return t('class_format', { class: leaked[1] });
+    };
     const [configs, setConfigs] = useState<Record<string, Config>>({});
     const [isEmblemModalOpen, setIsEmblemModalOpen] = useState(false);
     const [currentTargetTeamKey, setCurrentTargetTeamKey] = useState<string | null>(null);
@@ -558,7 +563,7 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ appMode = '
                                         className="w-full text-left p-3 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium"
                                     >
                                         <span className="font-semibold">{team.teamName}</span>
-                                        <span className="text-slate-400 text-sm ml-2">({set.className}, {team.playerIds?.length ?? 0}명)</span>
+                                        <span className="text-slate-400 text-sm ml-2">({displayClassName(set.className)}, {team.playerIds?.length ?? 0}명)</span>
                                     </button>
                                 ));
                             })()}
@@ -640,14 +645,14 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ appMode = '
                                                     : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                                             }`}
                                         >
-                                            {set.className}
+                                            {displayClassName(set.className)}
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setDeleteSetTarget({ id: set.id, className: set.className })}
                                             className="px-2 py-2 min-h-[44px] rounded-r-md bg-slate-700 hover:bg-red-900/60 text-slate-400 hover:text-red-300 border-l border-slate-600 transition-colors"
-                                            title={`${set.className} 삭제`}
-                                            aria-label={`${set.className} 대회 삭제`}
+                                            title={`${displayClassName(set.className)} 삭제`}
+                                            aria-label={`${displayClassName(set.className)} 대회 삭제`}
                                         >
                                             <TrashIcon className="w-4 h-4" />
                                         </button>
@@ -667,7 +672,7 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ appMode = '
                                                 : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
                                         }`}
                                     >
-                                        {className}
+                                        {displayClassName(className)}
                                     </button>
                                 ))
                             )}
@@ -713,7 +718,7 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ appMode = '
                             <div key={set.id} className="bg-slate-900 p-4 rounded-lg border border-slate-800">
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-xl font-bold text-slate-300">
-                                        {set.className}
+                                        {displayClassName(set.className)}
                                         {isClub && <span className="text-sm text-slate-400 ml-2">(대회/조)</span>}
                                         {set.teamCount && (
                                             <span className="text-sm text-slate-400 ml-2">({t('record_team_format', { count: set.teamCount })})</span>
@@ -840,8 +845,8 @@ const TeamManagementScreen: React.FC<TeamManagementScreenProps> = ({ appMode = '
                             <>
                                 <h3 className="text-lg font-bold text-sky-400 mb-3">
                                     {selectedFormatFilter !== 'all' 
-                                        ? `${selectedClassFilter === 'all' ? '전체' : selectedClassFilter}의 ${t('record_team_format', { count: parseInt(selectedFormatFilter) })} 정보가 없습니다.`
-                                        : `${selectedClassFilter === 'all' ? '전체' : selectedClassFilter}의 팀 정보가 없습니다.`}
+                                        ? `${selectedClassFilter === 'all' ? '전체' : displayClassName(selectedClassFilter)}의 ${t('record_team_format', { count: parseInt(selectedFormatFilter) })} 정보가 없습니다.`
+                                        : `${selectedClassFilter === 'all' ? '전체' : displayClassName(selectedClassFilter)}의 팀 정보가 없습니다.`}
                                 </h3>
                                 <p className="text-slate-300">
                                     {selectedFormatFilter !== 'all'

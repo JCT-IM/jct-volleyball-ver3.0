@@ -6,7 +6,8 @@ export const useTranslation = () => {
     const { language } = useData();
 
     const t = useCallback((key: string, replacements?: Record<string, string | number>): string => {
-        let translation = translations[key]?.[language] || key;
+        const entry = translations[key];
+        let translation = (entry && (entry[language] || entry.ko)) || key;
         if (replacements) {
             Object.keys(replacements).forEach(rKey => {
                 translation = translation.replace(`{${rKey}}`, String(replacements[rKey]));
