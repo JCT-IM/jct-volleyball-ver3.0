@@ -30,6 +30,7 @@ import AdminLockScreen from './screens/AdminLockScreen';
 import StudentJoinScreen from './screens/StudentJoinScreen';
 import RoleRecordScreen from './screens/RoleRecordScreen';
 import { AssessmentRankingScreen } from './screens/AssessmentRankingScreen';
+import AssessmentGradingScreen from './screens/AssessmentGradingScreen';
 import ScheduledBroadcastScreen from './screens/ScheduledBroadcastScreen';
 import { Player, Screen, Stats, STAT_KEYS, MatchState, SavedTeamInfo, SavedOpponentTeam, MatchRoles, ScheduledBroadcast } from './types';
 import ConfirmationModal from './components/common/ConfirmationModal';
@@ -96,7 +97,7 @@ const getInitialPendingJoinCodeFromUrl = (): string | null => {
     return liveCode ? liveCode.trim().toUpperCase() : null;
 };
 
-type ViewKey = 'menu' | 'teamBuilder' | 'matchSetup' | 'attendance' | 'scoreboard' | 'history' | 'referee' | 'teamManagement' | 'teamAnalysis' | 'heatmapAnalysis' | 'achievements' | 'skillDrill' | 'playerRecords' | 'cheerSong' | 'settings' | 'tournament' | 'leagueLobby' | 'league' | 'announcer' | 'cameraDirector' | 'competition' | 'roleRecord' | 'assessmentRanking' | 'scheduledBroadcast';
+type ViewKey = 'menu' | 'teamBuilder' | 'matchSetup' | 'attendance' | 'scoreboard' | 'history' | 'referee' | 'teamManagement' | 'teamAnalysis' | 'heatmapAnalysis' | 'achievements' | 'skillDrill' | 'playerRecords' | 'cheerSong' | 'settings' | 'tournament' | 'leagueLobby' | 'league' | 'announcer' | 'cameraDirector' | 'competition' | 'roleRecord' | 'assessmentRanking' | 'assessmentGrading' | 'scheduledBroadcast';
 
 const VIEW_TO_SEGMENT: Record<ViewKey, string> = {
     menu: '',
@@ -122,6 +123,7 @@ const VIEW_TO_SEGMENT: Record<ViewKey, string> = {
     competition: 'competition',
     roleRecord: 'role-record',
     assessmentRanking: 'assessment-ranking',
+    assessmentGrading: 'assessment-grading',
     scheduledBroadcast: 'scheduled-broadcast',
 };
 
@@ -526,6 +528,9 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
                 return <RoleRecordScreen onBack={() => setView('menu')} />;
             case 'assessmentRanking':
                 return <AssessmentRankingScreen onBack={() => setView('menu')} />;
+            case 'assessmentGrading':
+                if (appMode === 'CLUB') return null;
+                return <AssessmentGradingScreen onBack={() => setView('menu')} />;
             case 'referee':
                  return <RefereeScreen onStartMatch={handleStartRefereeMatch} />;
             case 'teamManagement':
@@ -632,6 +637,7 @@ const AppContent = ({ appMode, onReturnToInitialScreen }: { appMode: 'CLASS' | '
                         onShowPlayerRecords={() => setView('playerRecords')}
                         onShowRoleRecord={() => setView('roleRecord')}
                         onShowAssessmentRanking={() => setView('assessmentRanking')}
+                        onShowAssessmentGrading={appMode === 'CLASS' ? () => setView('assessmentGrading') : undefined}
                         onShowAchievements={() => setView('achievements')}
                         onStartSkillDrill={() => setView('skillDrill')}
                         onStartTeamAnalysis={() => setView('teamAnalysis')}

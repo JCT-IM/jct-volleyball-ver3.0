@@ -7,7 +7,8 @@ export interface TeamSideNumbers {
     serviceFaults?: number;
     blockingPoints?: number;
     spikeSuccesses?: number;
-    playerStats?: Record<string, { serveIn?: number; digs?: number } | null | undefined>;
+    threeHitPlays?: number;
+    playerStats?: Record<string, { serveIn?: number } | null | undefined>;
 }
 
 export interface AnalysisMatchInput {
@@ -37,8 +38,7 @@ export type TrendMetric =
     | 'points'
     | 'serveSuccessRate'
     | 'serviceFaults'
-    | 'receiveSuccessRate'
-    | 'digs'
+    | 'threeHitPlays'
     | 'spikeSuccesses'
     | 'blockingPoints';
 
@@ -46,8 +46,7 @@ export const TREND_METRICS: { key: TrendMetric; label: string }[] = [
     { key: 'points', label: '득점' },
     { key: 'serveSuccessRate', label: '서브 성공률' },
     { key: 'serviceFaults', label: '서브 범실' },
-    { key: 'receiveSuccessRate', label: '리시브 성공률(나이스 기준)' },
-    { key: 'digs', label: '리시브' },
+    { key: 'threeHitPlays', label: '3단 플레이' },
     { key: 'spikeSuccesses', label: '스파이크 득점' },
     { key: 'blockingPoints', label: '블로킹 득점' },
 ];
@@ -72,7 +71,7 @@ export interface TeamMatchSnapshot {
     serviceAces: number;
     serveIn: number;
     serviceFaults: number;
-    digs: number;
+    threeHitPlays: number;
     opponentAces: number;
     spikeSuccesses: number;
     blockingPoints: number;
@@ -92,7 +91,7 @@ export interface TeamBucket {
     serviceAces: number;
     serveIn: number;
     serviceFaults: number;
-    digs: number;
+    threeHitPlays: number;
     opponentAces: number;
     spikeSuccesses: number;
     blockingPoints: number;
@@ -103,10 +102,16 @@ export interface TeamRates {
     serveSuccessRate: number | null;
     serveSuccesses: number;
     serveAttempts: number;
-    /** 나이스 수비 / (나이스 수비 + 상대 서브 득점) × 100. 분모는 바꾸지 않는다. */
-    receiveSuccessRate: number | null;
-    receiveSuccesses: number;
-    receiveAttempts: number;
+    games: number;
+    /** 서브 범실 합 ÷ 경기수 */
+    serveFaultsPerGame: number | null;
+    serveFaultsTotal: number;
+    /** 3단 플레이 합 ÷ 경기수. 기록관 버튼 횟수. */
+    threeHitPerGame: number | null;
+    threeHitTotal: number;
+    /** 상대 서브 득점 합 ÷ 경기수 */
+    opponentAcesPerGame: number | null;
+    opponentAcesTotal: number;
     /** 총득점 / 총실점 */
     scoringRate: number | null;
     /** 승수 / 경기수 × 100. 팀 분석 표와 같은 식. */
@@ -119,20 +124,37 @@ export interface PooledRate {
     attempts: number;
 }
 
+/** 다른 팀 기록을 경기 수로 나눈 합산 평균. 팀별 평균을 다시 평균내지 않는다. */
+export interface PooledPerGame {
+    perGame: number | null;
+    total: number;
+    games: number;
+}
+
 const num = (value: unknown): number => {
     const n = Number(value);
     return Number.isFinite(n) ? n : 0;
 };
 
-/** playerStats 에서 숫자 필드만 합산. 키(선수 id)와 그 외 필드는 쓰지 않는다. */
-const sumStat = (playerStats: TeamSideNumbers['playerStats'], key: 'serveIn' | 'digs'): number => {
+/** playerStats 에서 서브 In 숫자만 합산. 키(선수 id)와 그 외 필드는 쓰지 않는다. */
+const sumServeIn = (playerStats: TeamSideNumbers['playerStats']): number => {
     if (!playerStats) return 0;
     let sum = 0;
     for (const stat of Object.values(playerStats)) {
-        sum += num(stat?.[key]);
+        sum += num(stat?.serveIn);
     }
     return sum;
 };
+
+export const formatPerGame = (value: number | null): string => {
+    if (value == null || Number.isNaN(value)) return '기록 없음';
+    const roundedValue = Math.round(value * 10) / 10;
+    return Number.isInteger(roundedValue) ? String(roundedValue) : roundedValue.toFixed(1);
+};
+
+const perGame = (total: number, games: number): number | null => (
+    games > 0 ? total / games : null
+);
 
 export const formatPercent = (value: number | null): string => {
     if (value == null || Number.isNaN(value)) return '기록 없음';
@@ -184,9 +206,9 @@ const snapshotOf = (match: AnalysisMatchInput, teamName: string): TeamMatchSnaps
         pointsFor,
         pointsAgainst,
         serviceAces: num(ours.serviceAces),
-        serveIn: sumStat(ours.playerStats, 'serveIn'),
+        serveIn: sumServeIn(ours.playerStats),
         serviceFaults: num(ours.serviceFaults),
-        digs: sumStat(ours.playerStats, 'digs'),
+        threeHitPlays: num(ours.threeHitPlays),
         opponentAces: num(opp.serviceAces),
         spikeSuccesses: num(ours.spikeSuccesses),
         blockingPoints: num(ours.blockingPoints),
@@ -258,7 +280,7 @@ export const emptyBucket = (): TeamBucket => ({
     serviceAces: 0,
     serveIn: 0,
     serviceFaults: 0,
-    digs: 0,
+    threeHitPlays: 0,
     opponentAces: 0,
     spikeSuccesses: 0,
     blockingPoints: 0,
@@ -275,7 +297,7 @@ export const bucketFrom = (snapshots: TeamMatchSnapshot[]): TeamBucket => {
         bucket.serviceAces += s.serviceAces;
         bucket.serveIn += s.serveIn;
         bucket.serviceFaults += s.serviceFaults;
-        bucket.digs += s.digs;
+        bucket.threeHitPlays += s.threeHitPlays;
         bucket.opponentAces += s.opponentAces;
         bucket.spikeSuccesses += s.spikeSuccesses;
         bucket.blockingPoints += s.blockingPoints;
@@ -286,15 +308,17 @@ export const bucketFrom = (snapshots: TeamMatchSnapshot[]): TeamBucket => {
 export const ratesFromBucket = (bucket: TeamBucket): TeamRates => {
     const serveSuccesses = bucket.serviceAces + bucket.serveIn;
     const serveAttempts = serveSuccesses + bucket.serviceFaults;
-    const receiveSuccesses = bucket.digs;
-    const receiveAttempts = receiveSuccesses + bucket.opponentAces;
     return {
         serveSuccessRate: serveAttempts > 0 ? (serveSuccesses / serveAttempts) * 100 : null,
         serveSuccesses,
         serveAttempts,
-        receiveSuccessRate: receiveAttempts > 0 ? (receiveSuccesses / receiveAttempts) * 100 : null,
-        receiveSuccesses,
-        receiveAttempts,
+        games: bucket.games,
+        serveFaultsPerGame: perGame(bucket.serviceFaults, bucket.games),
+        serveFaultsTotal: bucket.serviceFaults,
+        threeHitPerGame: perGame(bucket.threeHitPlays, bucket.games),
+        threeHitTotal: bucket.threeHitPlays,
+        opponentAcesPerGame: perGame(bucket.opponentAces, bucket.games),
+        opponentAcesTotal: bucket.opponentAces,
         scoringRate: bucket.pointsAgainst > 0 ? bucket.pointsFor / bucket.pointsAgainst : null,
         winRate: bucket.games > 0 ? (bucket.wins / bucket.games) * 100 : null,
     };
@@ -309,22 +333,22 @@ const addSnapshot = (bucket: TeamBucket, snapshot: TeamMatchSnapshot) => {
     bucket.serviceAces += snapshot.serviceAces;
     bucket.serveIn += snapshot.serveIn;
     bucket.serviceFaults += snapshot.serviceFaults;
-    bucket.digs += snapshot.digs;
+    bucket.threeHitPlays += snapshot.threeHitPlays;
     bucket.opponentAces += snapshot.opponentAces;
     bucket.spikeSuccesses += snapshot.spikeSuccesses;
     bucket.blockingPoints += snapshot.blockingPoints;
 };
 
 /**
- * 같은 반에서 보고 있는 팀을 뺀 다른 팀의 서브·리시브 시도를 하나로 합친 성공률.
- * 팀마다 성공률을 낸 뒤 다시 평균내지 않는다.
+ * 같은 반에서 보고 있는 팀을 뺀 다른 팀의 시도를 하나로 합친 평균.
+ * 팀마다 평균을 낸 뒤 다시 평균내지 않는다.
  */
 export const peerClassRates = (
     className: string,
     excludeTeamName: string,
     matches: AnalysisMatchInput[],
     teamSets: TeamSetRef[],
-): { serve: PooledRate; receive: PooledRate } => {
+): { serve: PooledRate; serveFaults: PooledPerGame; threeHit: PooledPerGame } => {
     const bucket = emptyBucket();
     const names = new Set<string>();
     for (const match of matches) {
@@ -346,20 +370,21 @@ export const peerClassRates = (
     const rates = ratesFromBucket(bucket);
     return {
         serve: { rate: rates.serveSuccessRate, successes: rates.serveSuccesses, attempts: rates.serveAttempts },
-        receive: { rate: rates.receiveSuccessRate, successes: rates.receiveSuccesses, attempts: rates.receiveAttempts },
+        serveFaults: { perGame: rates.serveFaultsPerGame, total: rates.serveFaultsTotal, games: rates.games },
+        threeHit: { perGame: rates.threeHitPerGame, total: rates.threeHitTotal, games: rates.games },
     };
 };
 
 export type RateChange = '상승' | '하락' | '같음' | '표본 적음';
 
 export interface MetricReading {
-    key: 'serve' | 'receive';
+    key: 'serve' | 'threeHit';
     label: string;
     rateText: string;
     countText: string | null;
     averageText: string;
     changeText: string;
-    attempts: number;
+    sampleDetail: string;
 }
 
 export interface MetricReadingGroups {
@@ -373,10 +398,20 @@ export interface MetricReadingGroups {
 
 const rounded = (value: number) => Math.round(value * 10) / 10;
 
-const changeOf = (before: number | null, beforeAttempts: number, after: number | null, afterAttempts: number): RateChange => {
-    if (before == null || after == null || beforeAttempts < MIN_SAMPLE_ATTEMPTS || afterAttempts < MIN_SAMPLE_ATTEMPTS) {
-        return '표본 적음';
-    }
+/** 서브 시도 5회 미만이거나 경기 수가 1경기 이하면 반 평균과 비교하지 않는다. */
+export const isSmallSample = (rates: { games: number; serveAttempts: number }): boolean => (
+    rates.games <= 1 || rates.serveAttempts < MIN_SAMPLE_ATTEMPTS
+);
+
+const sampleDetail = (rates: TeamRates): string => {
+    const parts: string[] = [];
+    if (rates.serveAttempts < MIN_SAMPLE_ATTEMPTS) parts.push(`서브 시도 ${rates.serveAttempts}회`);
+    if (rates.games <= 1) parts.push(`경기 ${rates.games}`);
+    return parts.join(' · ');
+};
+
+const changeOf = (before: number | null, beforeSmall: boolean, after: number | null, afterSmall: boolean): RateChange => {
+    if (before == null || after == null || beforeSmall || afterSmall) return '표본 적음';
     const left = rounded(before);
     const right = rounded(after);
     if (right > left) return '상승';
@@ -385,85 +420,82 @@ const changeOf = (before: number | null, beforeAttempts: number, after: number |
 };
 
 /**
- * 서브 성공률·리시브 성공률만 반 평균과 비교한다.
- * 시도가 5회 미만이면 높은/낮은 쪽에 넣지 않는다.
+ * 서브 성공률과 3단 플레이(경기당)만 반 평균과 비교한다.
+ * 서브 시도가 5회 미만이거나 경기 수가 1경기 이하면 높은/낮은 쪽에 넣지 않는다.
  */
-export const readServeReceive = (input: {
+export const readJudgedMetrics = (input: {
     overall: TeamRates;
     sideA: TeamRates;
     sideB: TeamRates;
     labelA: string;
     labelB: string;
     classServeAverage: number | null;
-    classReceiveAverage: number | null;
     classServeAttempts: number;
-    classReceiveAttempts: number;
+    classThreeHitPerGame: number | null;
+    classThreeHitGames: number;
 }): MetricReadingGroups => {
     const groups: MetricReadingGroups = { higher: [], lower: [], same: [], smallSample: [], noBaseline: [] };
+    const overallSmall = isSmallSample(input.overall);
+    const sideASmall = isSmallSample(input.sideA);
+    const sideBSmall = isSmallSample(input.sideB);
     const specs: {
-        key: 'serve' | 'receive';
+        key: 'serve' | 'threeHit';
         label: string;
-        rate: number | null;
-        successes: number;
-        attempts: number;
+        value: number | null;
+        valueText: string;
+        countText: string | null;
         before: number | null;
-        beforeAttempts: number;
         after: number | null;
-        afterAttempts: number;
         classAverage: number | null;
-        classAttempts: number;
-        withCount: boolean;
+        classReady: boolean;
+        averageText: string;
     }[] = [
         {
             key: 'serve',
             label: '서브 성공률',
-            rate: input.overall.serveSuccessRate,
-            successes: input.overall.serveSuccesses,
-            attempts: input.overall.serveAttempts,
+            value: input.overall.serveSuccessRate,
+            valueText: formatPercent(input.overall.serveSuccessRate),
+            countText: null,
             before: input.sideA.serveSuccessRate,
-            beforeAttempts: input.sideA.serveAttempts,
             after: input.sideB.serveSuccessRate,
-            afterAttempts: input.sideB.serveAttempts,
             classAverage: input.classServeAverage,
-            classAttempts: input.classServeAttempts,
-            withCount: false,
+            classReady: input.classServeAverage != null && input.classServeAttempts >= MIN_SAMPLE_ATTEMPTS,
+            averageText: input.classServeAverage == null ? '반 평균 기록 없음' : `반 평균 ${formatPercent(input.classServeAverage)}`,
         },
         {
-            key: 'receive',
-            label: '리시브 성공률(나이스 기준)',
-            rate: input.overall.receiveSuccessRate,
-            successes: input.overall.receiveSuccesses,
-            attempts: input.overall.receiveAttempts,
-            before: input.sideA.receiveSuccessRate,
-            beforeAttempts: input.sideA.receiveAttempts,
-            after: input.sideB.receiveSuccessRate,
-            afterAttempts: input.sideB.receiveAttempts,
-            classAverage: input.classReceiveAverage,
-            classAttempts: input.classReceiveAttempts,
-            withCount: true,
+            key: 'threeHit',
+            label: '3단 플레이(경기당)',
+            value: input.overall.threeHitPerGame,
+            valueText: formatPerGame(input.overall.threeHitPerGame),
+            countText: input.overall.games > 0 ? `총 ${input.overall.threeHitTotal}` : null,
+            before: input.sideA.threeHitPerGame,
+            after: input.sideB.threeHitPerGame,
+            classAverage: input.classThreeHitPerGame,
+            classReady: input.classThreeHitPerGame != null && input.classThreeHitGames > 1,
+            averageText: input.classThreeHitPerGame == null ? '반 평균 기록 없음' : `반 평균 ${formatPerGame(input.classThreeHitPerGame)}`,
         },
     ];
 
     for (const spec of specs) {
-        const change = changeOf(spec.before, spec.beforeAttempts, spec.after, spec.afterAttempts);
+        const change = changeOf(spec.before, sideASmall, spec.after, sideBSmall);
         const item: MetricReading = {
             key: spec.key,
             label: spec.label,
-            rateText: formatPercent(spec.rate),
-            countText: spec.withCount && spec.attempts > 0 ? `${spec.successes}/${spec.attempts}` : null,
-            averageText: spec.classAverage == null ? '반 평균 기록 없음' : `반 평균 ${formatPercent(spec.classAverage)}`,
+            rateText: spec.valueText,
+            countText: spec.countText,
+            averageText: spec.averageText,
             changeText: `${input.labelA}→${input.labelB} ${change}`,
-            attempts: spec.attempts,
+            sampleDetail: sampleDetail(input.overall),
         };
-        if (spec.attempts < MIN_SAMPLE_ATTEMPTS || spec.rate == null) {
+        if (overallSmall || spec.value == null) {
             groups.smallSample.push(item);
             continue;
         }
-        if (spec.classAverage == null || spec.classAttempts < MIN_SAMPLE_ATTEMPTS) {
+        if (!spec.classReady || spec.classAverage == null) {
             groups.noBaseline.push(item);
             continue;
         }
-        const ours = rounded(spec.rate);
+        const ours = rounded(spec.value);
         const peer = rounded(spec.classAverage);
         if (ours > peer) groups.higher.push(item);
         else if (ours < peer) groups.lower.push(item);
@@ -475,12 +507,11 @@ export const readServeReceive = (input: {
 const metricNumber = (snapshot: TeamMatchSnapshot, metric: TrendMetric): number => {
     if (metric === 'points') return snapshot.pointsFor;
     if (metric === 'serviceFaults') return snapshot.serviceFaults;
-    if (metric === 'digs') return snapshot.digs;
+    if (metric === 'threeHitPlays') return snapshot.threeHitPlays;
     if (metric === 'spikeSuccesses') return snapshot.spikeSuccesses;
     if (metric === 'blockingPoints') return snapshot.blockingPoints;
     const rates = ratesFromBucket(bucketFrom([snapshot]));
-    const value = metric === 'serveSuccessRate' ? rates.serveSuccessRate : rates.receiveSuccessRate;
-    return value == null ? 0 : parseFloat(value.toFixed(1));
+    return rates.serveSuccessRate == null ? 0 : parseFloat(rates.serveSuccessRate.toFixed(1));
 };
 
 export interface TeamTrendPoint {
@@ -521,15 +552,21 @@ export interface TeamAiSummaryInput {
     round1: TeamRates;
     round2: TeamRates;
     classServeAverage: number | null;
-    classReceiveAverage: number | null;
+    classServeFaultsPerGame: number | null;
+    classThreeHitPerGame: number | null;
 }
+
+const withAverage = (value: number | null, format: (value: number | null) => string): string => (
+    value == null ? '' : `(반 평균 ${format(value)})`
+);
 
 /**
  * 복사 문장. 팀 이름·학생 이름·학번은 인자로 받지 않고, 주어는 항상 '우리 팀'이다.
  * 숫자와 반 평균만 담는다.
  */
 export const buildTeamAiSummary = (input: TeamAiSummaryInput): string => {
-    const serveAverage = input.classServeAverage == null ? '' : `(반 평균 ${formatPercent(input.classServeAverage)})`;
-    const receiveAverage = input.classReceiveAverage == null ? '' : `(반 평균 ${formatPercent(input.classReceiveAverage)})`;
-    return `우리 팀 서브 성공률 1회전 ${formatPercent(input.round1.serveSuccessRate)} → 2회전 ${formatPercent(input.round2.serveSuccessRate)}${serveAverage}, 리시브 성공률(나이스 기준) 1회전 ${formatPercent(input.round1.receiveSuccessRate)} → 2회전 ${formatPercent(input.round2.receiveSuccessRate)}${receiveAverage}, 득점률 1회전 ${formatRatio(input.round1.scoringRate)} → 2회전 ${formatRatio(input.round2.scoringRate)}, 승률 1회전 ${formatPercent(input.round1.winRate)} → 2회전 ${formatPercent(input.round2.winRate)}`;
+    const serveAverage = withAverage(input.classServeAverage, formatPercent);
+    const faultAverage = withAverage(input.classServeFaultsPerGame, formatPerGame);
+    const threeHitAverage = withAverage(input.classThreeHitPerGame, formatPerGame);
+    return `우리 팀 서브 성공률 1회전 ${formatPercent(input.round1.serveSuccessRate)} → 2회전 ${formatPercent(input.round2.serveSuccessRate)}${serveAverage}, 서브 범실 1회전 ${formatPerGame(input.round1.serveFaultsPerGame)} → 2회전 ${formatPerGame(input.round2.serveFaultsPerGame)}${faultAverage}, 3단 플레이 경기당 1회전 ${formatPerGame(input.round1.threeHitPerGame)} → 2회전 ${formatPerGame(input.round2.threeHitPerGame)}${threeHitAverage}, 득점률 1회전 ${formatRatio(input.round1.scoringRate)} → 2회전 ${formatRatio(input.round2.scoringRate)}, 승률 1회전 ${formatPercent(input.round1.winRate)} → 2회전 ${formatPercent(input.round2.winRate)}`;
 };

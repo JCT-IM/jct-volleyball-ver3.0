@@ -8,7 +8,6 @@ import {
     CATEGORY_ORDER,
     CATEGORY_SHORT,
     ClassifiedTeamMatch,
-    MIN_SAMPLE_ATTEMPTS,
     MatchCategory,
     MetricReading,
     PooledRate,
@@ -22,10 +21,12 @@ import {
     buildTrendPoints,
     categorizeTeamMatches,
     formatPercent,
+    formatPerGame,
     formatRatio,
+    isSmallSample,
     peerClassRates,
     ratesFromBucket,
-    readServeReceive,
+    readJudgedMetrics,
 } from '../utils/teamDetailStats';
 
 interface TeamDetailModalProps {
@@ -45,17 +46,12 @@ const comparisonRows: { label: string; read: (bucket: TeamBucket, rates: TeamRat
     { label: '패', read: (bucket) => String(bucket.losses) },
     { label: '승률', read: (_bucket, rates) => formatPercent(rates.winRate) },
     { label: '서브 성공률', read: (_bucket, rates) => formatPercent(rates.serveSuccessRate) },
-    {
-        label: '리시브 성공률(나이스 기준)',
-        read: (_bucket, rates) => rates.receiveAttempts > 0
-            ? `${formatPercent(rates.receiveSuccessRate)} (${rates.receiveSuccesses}/${rates.receiveAttempts})`
-            : formatPercent(rates.receiveSuccessRate),
-    },
+    { label: '서브 범실', read: (_bucket, rates) => rates.games > 0 ? `${formatPerGame(rates.serveFaultsPerGame)} (총 ${rates.serveFaultsTotal})` : '기록 없음' },
+    { label: '상대 서브 득점 허용', read: (_bucket, rates) => rates.games > 0 ? `${rates.opponentAcesTotal} (경기당 ${formatPerGame(rates.opponentAcesPerGame)})` : '기록 없음' },
+    { label: '3단 플레이(경기당)', read: (_bucket, rates) => rates.games > 0 ? `${formatPerGame(rates.threeHitPerGame)} (총 ${rates.threeHitTotal})` : '기록 없음' },
     { label: '득점률', read: (_bucket, rates) => formatRatio(rates.scoringRate) },
     { label: '총득점', read: (bucket) => String(bucket.pointsFor) },
     { label: '총실점', read: (bucket) => String(bucket.pointsAgainst) },
-    { label: '서브 범실', read: (bucket) => String(bucket.serviceFaults) },
-    { label: '리시브(나이스 수비)', read: (bucket) => String(bucket.digs) },
 ];
 
 const SummaryCard = ({ label, value, count, hint, note }: { label: string; value: string; count?: string | null; hint?: string; note?: string }) => (
@@ -72,6 +68,10 @@ const SummaryCard = ({ label, value, count, hint, note }: { label: string; value
 
 const averageHint = (pooled: PooledRate) => (
     pooled.rate == null ? '반 평균 기록 없음' : `반 평균 ${formatPercent(pooled.rate)}`
+);
+
+const perGameHint = (perGame: number | null) => (
+    perGame == null ? '반 평균 기록 없음' : `반 평균 ${formatPerGame(perGame)}`
 );
 
 const ReadingGroup = ({ title, items }: { title: string; items: MetricReading[] }) => (
@@ -146,16 +146,16 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
         () => peerClassRates(className, teamName, matches, teamSets),
         [className, teamName, matches, teamSets],
     );
-    const reading = useMemo(() => readServeReceive({
+    const reading = useMemo(() => readJudgedMetrics({
         overall: overallRates,
         sideA: ratesByCategory[compareA],
         sideB: ratesByCategory[compareB],
         labelA: CATEGORY_SHORT[compareA],
         labelB: CATEGORY_SHORT[compareB],
         classServeAverage: peers.serve.rate,
-        classReceiveAverage: peers.receive.rate,
         classServeAttempts: peers.serve.attempts,
-        classReceiveAttempts: peers.receive.attempts,
+        classThreeHitPerGame: peers.threeHit.perGame,
+        classThreeHitGames: peers.threeHit.games,
     }), [overallRates, ratesByCategory, compareA, compareB, peers]);
     const trend = useMemo(
         () => buildTrendPoints(classified, trendCategory, metric, teamName),
@@ -166,7 +166,8 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
             round1: ratesByCategory.assessment1,
             round2: ratesByCategory.assessment2,
             classServeAverage: peers.serve.rate,
-            classReceiveAverage: peers.receive.rate,
+            classServeFaultsPerGame: peers.serveFaults.perGame,
+            classThreeHitPerGame: peers.threeHit.perGame,
         }),
         [ratesByCategory, peers],
     );
@@ -230,14 +231,14 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
                         label="서브 성공률"
                         value={formatPercent(overallRates.serveSuccessRate)}
                         hint={averageHint(peers.serve)}
-                        note={overallRates.serveAttempts < MIN_SAMPLE_ATTEMPTS ? '표본 적음' : undefined}
+                        note={isSmallSample(overallRates) ? '표본 적음' : undefined}
                     />
                     <SummaryCard
-                        label="리시브 성공률(나이스 기준)"
-                        value={formatPercent(overallRates.receiveSuccessRate)}
-                        count={overallRates.receiveAttempts > 0 ? `${overallRates.receiveSuccesses}/${overallRates.receiveAttempts}` : null}
-                        hint={averageHint(peers.receive)}
-                        note={overallRates.receiveAttempts < MIN_SAMPLE_ATTEMPTS ? '표본 적음' : undefined}
+                        label="3단 플레이(경기당)"
+                        value={formatPerGame(overallRates.threeHitPerGame)}
+                        count={overallRates.games > 0 ? `총 ${overallRates.threeHitTotal}` : null}
+                        hint={perGameHint(peers.threeHit.perGame)}
+                        note={isSmallSample(overallRates) ? '표본 적음' : undefined}
                     />
                     <SummaryCard
                         label="득점률"
@@ -272,7 +273,7 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
                             <ul className="space-y-1">
                                 {reading.smallSample.map(item => (
                                     <li key={item.key} className="text-sm text-slate-300">
-                                        {item.label} {item.rateText}{item.countText ? ` (${item.countText})` : ''} · 표본 적음 (시도 {item.attempts}회)
+                                        {item.label} {item.rateText}{item.countText ? ` (${item.countText})` : ''} · 표본 적음{item.sampleDetail ? ` (${item.sampleDetail})` : ''}
                                     </li>
                                 ))}
                             </ul>
@@ -372,8 +373,8 @@ export const TeamDetailModal: React.FC<TeamDetailModalProps> = ({
 
                 <p className="text-[11px] text-slate-500 leading-relaxed">
                     득점률 = 총득점 ÷ 총실점. 승률 = 승수 ÷ 경기수. 서브 성공률 = (서브 득점 + 서브 In) ÷ (서브 득점 + 서브 In + 서브 범실).
-                    리시브 성공률(나이스 기준) = 나이스 수비 ÷ (나이스 수비 + 상대 서브 득점). 옆의 개수는 나이스 수비/그 분모입니다.
-                    반 평균은 같은 반에서 이 팀을 뺀 다른 팀의 시도를 합쳐 계산합니다. 시도가 5회 미만이면 표본 적음으로 두고 반 평균과 비교하지 않습니다.
+                    3단 플레이는 기록관이 버튼을 누른 횟수 기준이며, 경기당 평균은 그 합계를 경기 수로 나눈 값입니다. 서브 범실과 상대 서브 득점 허용도 합계를 경기 수로 나눕니다.
+                    반 평균은 같은 반에서 이 팀을 뺀 다른 팀의 기록을 합쳐 계산합니다. 서브 시도가 5회 미만이거나 경기 수가 1경기 이하면 표본 적음으로 두고 반 평균과 비교하지 않습니다.
                     수행평가 1·2회전은 같은 반 수행평가 경기일을 날짜순으로 앞뒤로 나눕니다. 경기일이 하루뿐이면 앞에서 (팀 수−1)경기를 1회전으로 둡니다.
                 </p>
             </div>

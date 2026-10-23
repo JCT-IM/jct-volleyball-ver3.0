@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { useData } from '../contexts/DataContext';
 import { Player, PlayerCumulativeStats, TeamSet } from '../types';
 import { useTranslation } from '../hooks/useTranslation';
-import { collectHustlePlayerIds } from '../utils/hustleAssignment';
+import { collectAssessmentHustlePlayerIds } from '../utils/hustleAssignment';
 
 type TabType = 'excellence' | 'effort';
 
@@ -98,7 +98,7 @@ export const AssessmentRankingScreen: React.FC<AssessmentRankingScreenProps> = (
     const filteredHustleCountByPlayerId = useMemo(() => {
         const count = new Map<string, number>();
         filteredMatchHistory.forEach(match => {
-            collectHustlePlayerIds(match).forEach(pid => {
+            collectAssessmentHustlePlayerIds(match).forEach(pid => {
                 count.set(pid, (count.get(pid) ?? 0) + 1);
             });
         });
