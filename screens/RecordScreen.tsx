@@ -1044,7 +1044,7 @@ const RecordScreen: React.FC<RecordScreenProps> = ({ appMode = 'CLASS', onContin
         requestPassword(() => setHustleEditMatch(match));
     };
 
-    const handleSaveRetroactiveHustle = async (playerId: string, markAsAssessment: boolean) => {
+    const handleSaveRetroactiveHustle = async (playerIds: string[], change: { markAsAssessment: boolean; revertToRegular: boolean }) => {
         const editing = hustleEditMatch;
         if (!editing || isStudentViewer || editing.status !== 'completed') return;
 
@@ -1072,9 +1072,9 @@ const RecordScreen: React.FC<RecordScreenProps> = ({ appMode = 'CLASS', onContin
             return;
         }
 
-        const next = applyRetroactiveHustle(stored.raw, playerId, { markAsAssessment });
+        const next = applyRetroactiveHustle(stored.raw, playerIds, change);
         if (!next) {
-            showToast('출전 선수만 허슬 플레이어로 지정할 수 있습니다.', 'error');
+            showToast('명단과 기존 허슬 선택에 있는 학생만 지정할 수 있습니다.', 'error');
             return;
         }
 

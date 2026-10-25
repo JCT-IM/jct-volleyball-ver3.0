@@ -254,7 +254,7 @@ export interface MatchState {
     tournamentTargetScore?: number;
     /** 수업 모드 수행평가 기록 여부 */
     isAssessment?: boolean;
-    /** 수행평가 종료 시 선정된 허슬 플레이어(노력상) ID 목록. 사후 지정은 1명 */
+    /** 수행평가 종료 시 선정된 허슬 플레이어(노력상) ID 목록. 팀당 여러 명 */
     hustlePlayerIds?: string[];
     /** 상세 보기용: 허슬 플레이어 id, name, team 배열 */
     hustlePlayers?: { id: string; name: string; team: 'A' | 'B' }[];
