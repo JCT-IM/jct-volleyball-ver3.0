@@ -409,7 +409,7 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
         return items;
     }, [standings, config.expectedTeamMatchCount, listedMatches, students]);
 
-    const criteriaSummary = `팀 ${maxScore(config.rankPoints.map(item => item.score))}·개인 ${maxScore(config.individualBands.map(item => item.score))}·역할 ${maxScore(config.roleBands.map(item => item.score))}·포트폴리오 ${maxScore(config.portfolioOptions)} / 개인 지수: ${config.indexScope === 'assessment' ? '수행평가 경기만' : '누적'} / 득실율: ${config.ratioBasis === 'rally' ? '랠리 점수' : '합계'}`;
+    const criteriaSummary = `팀 ${maxScore(config.rankPoints.map(item => item.score))}·개인 ${maxScore(config.individualBands.map(item => item.score))}·역할 ${maxScore(config.roleBands.map(item => item.score))}·포트폴리오 ${maxScore(config.portfolioOptions)} / 개인 지수: ${config.indexScope === 'assessment' ? '수행평가 경기만' : '누적'} ×${config.indexScale} / 득실율: ${config.ratioBasis === 'rally' ? '랠리 점수' : '합계'}`;
 
     const reveal = (section: 'criteria' | 'matches' | 'standings' | 'students', targetId: string, studentKey?: string) => {
         setSections(prev => ({ ...prev, [section]: true }));
@@ -631,6 +631,8 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                             <label className="mr-4"><input type="radio" checked={config.indexScope === 'cumulative'} onChange={() => patchConfig({ indexScope: 'cumulative' })} /> 랭킹 보드와 동일(누적)</label>
                             <label><input type="radio" checked={config.indexScope === 'assessment'} onChange={() => patchConfig({ indexScope: 'assessment' })} /> 수행평가 경기만</label>
                         </fieldset>
+                        <label className="inline-flex items-center text-sm text-slate-200">지수 배율 <NumberBox value={config.indexScale} step="0.1" onCommit={value => patchConfig({ indexScale: value })} /></label>
+                        <p className="text-sm text-slate-400">우수 지수와 노력 지수에 같은 배율을 곱한 뒤 높은 쪽에 개인 평가 구간을 적용합니다. 랭킹 보드 산식과 표시는 그대로입니다.</p>
                         <BandEditor
                             title="팀 순위 점수"
                             rows={config.rankPoints.map(item => ({ minInclusive: item.rank, score: item.score }))}
@@ -992,12 +994,13 @@ function setLabel(set: TeamSet) {
     return `${set.className} · ${count}팀${date ? ` · ${date}` : ''}`;
 }
 
-function NumberBox({ value, onCommit }: { value: number; onCommit: (value: number) => void }) {
+function NumberBox({ value, onCommit, step }: { value: number; onCommit: (value: number) => void; step?: string }) {
     const [text, setText] = useState(String(value));
     useEffect(() => { setText(String(value)); }, [value]);
     return (
         <input
             type="number"
+            step={step}
             value={text}
             onChange={event => setText(event.target.value)}
             onBlur={() => {

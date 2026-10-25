@@ -6,6 +6,7 @@ import {
     choosePersonalIndex,
     defaultAssessmentConfig,
     duplicateRoleKeys,
+    mergeConfig,
     extractMatchTotals,
     individualDistribution,
     meetsHalfParticipation,
@@ -117,12 +118,12 @@ test('개인 점수는 높은 지수 하나에 구간을 적용하고 분포가 
     assert.equal(higherEffort.source, 'effort');
     assert.equal(higherEffort.value, 12);
     const played = personalEvaluation(true, stats({ points: 10, serviceAces: 2, spikeSuccesses: 5, blockingPoints: 3, digs: 1 }), config);
-    assert.equal(played.excellence, 20);
+    assert.equal(played.excellence, 40);
     assert.equal(played.source, 'excellence');
     assert.equal(played.score, 10);
     const low = personalEvaluation(true, stats({ digs: 4 }), config);
-    assert.equal(low.chosen, 4);
-    assert.equal(low.score, 7);
+    assert.equal(low.chosen, 8);
+    assert.equal(low.score, 8);
     const absent = personalEvaluation(false, stats(), config);
     assert.equal(absent.score, 4);
 
@@ -141,6 +142,28 @@ test('개인 점수는 높은 지수 하나에 구간을 적용하고 분포가 
         { score: 6, count: 1 },
         { score: 4, count: 1 },
     ]);
+});
+
+test('지수 배율은 우수와 노력에 같이 곱한 뒤 높은 쪽에 구간을 적용하고, 없는 값은 반마다 2.0이다', () => {
+    assert.equal(defaultAssessmentConfig().indexScale, 2);
+    assert.equal(mergeConfig(undefined).indexScale, 2);
+    assert.equal(mergeConfig({}).indexScale, 2);
+    assert.equal(mergeConfig({ indexScale: 1.5 }).indexScale, 1.5);
+
+    const unscaled = { ...config, indexScale: 1 };
+    const raw = personalEvaluation(true, stats({ points: 4, digs: 5 }), unscaled);
+    assert.equal(raw.excellence, 4);
+    assert.equal(raw.effort, 5);
+    assert.equal(raw.source, 'effort');
+    assert.equal(raw.chosen, 5);
+    assert.equal(raw.score, 7);
+
+    const scaled = personalEvaluation(true, stats({ points: 4, digs: 5 }), { ...config, indexScale: 2 });
+    assert.equal(scaled.excellence, 8);
+    assert.equal(scaled.effort, 10);
+    assert.equal(scaled.source, 'effort');
+    assert.equal(scaled.chosen, 10);
+    assert.equal(scaled.score, 9);
 });
 
 test('수정 잠금은 재계산 값을 덮어쓰지 않고 역할 횟수 수정은 역할 점수를 다시 계산한다', () => {

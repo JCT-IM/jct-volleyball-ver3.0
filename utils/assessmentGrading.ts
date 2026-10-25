@@ -6,6 +6,7 @@
  * 우수/노력 지수는 screens/AssessmentRankingScreen.tsx 와 같은 식이다.
  * 우수 = 득점×1 + 에이스×1 + 스파이크×1 + 블로킹×1
  * 노력 = 노력상×2 + 디그×1 + 서브 인×0.5 + 어시스트×0.5
+ * 채점만 지수 배율을 곱한 뒤 둘 중 높은 쪽에 개인 평가 구간을 적용한다.
  */
 
 export type RatioBasis = 'rally' | 'sum';
@@ -32,6 +33,7 @@ export interface AssessmentGradingConfig {
     lossPoints: number;
     ratioBasis: RatioBasis;
     indexScope: IndexScope;
+    indexScale: number;
     individualBands: ScoreBand[];
     individualFallbackScore: number;
     individualAbsentScore: number;
@@ -145,6 +147,7 @@ export const defaultAssessmentConfig = (): AssessmentGradingConfig => ({
     lossPoints: 0,
     ratioBasis: 'rally',
     indexScope: 'cumulative',
+    indexScale: 2.0,
     individualBands: [
         { minInclusive: 15, score: 10 },
         { minInclusive: 10, score: 9 },
@@ -168,6 +171,7 @@ export const defaultAssessmentConfig = (): AssessmentGradingConfig => ({
 export const mergeConfig = (partial?: Partial<AssessmentGradingConfig> | null): AssessmentGradingConfig => {
     const base = defaultAssessmentConfig();
     if (!partial) return base;
+    const indexScale = Number(partial.indexScale);
     return {
         ...base,
         ...partial,
@@ -175,6 +179,7 @@ export const mergeConfig = (partial?: Partial<AssessmentGradingConfig> | null): 
         individualBands: Array.isArray(partial.individualBands) ? partial.individualBands.map(item => ({ ...item })) : base.individualBands,
         roleBands: Array.isArray(partial.roleBands) ? partial.roleBands.map(item => ({ ...item })) : base.roleBands,
         portfolioOptions: Array.isArray(partial.portfolioOptions) ? [...partial.portfolioOptions] : base.portfolioOptions,
+        indexScale: Number.isFinite(indexScale) ? indexScale : base.indexScale,
     };
 };
 
@@ -492,8 +497,9 @@ export const personalEvaluation = (
     if (!participated) {
         return { excellence: 0, effort: 0, chosen: 0, source: 'absent', score: config.individualAbsentScore };
     }
-    const excellence = excellenceIndex(stats);
-    const effort = effortIndex(stats);
+    const scale = Number.isFinite(config.indexScale) ? config.indexScale : 2.0;
+    const excellence = excellenceIndex(stats) * scale;
+    const effort = effortIndex(stats) * scale;
     const chosen = choosePersonalIndex(excellence, effort);
     return {
         excellence,
