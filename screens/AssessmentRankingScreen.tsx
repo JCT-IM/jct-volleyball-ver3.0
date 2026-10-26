@@ -12,7 +12,7 @@ const EXCELLENCE_WEIGHT_ACE = 1.0;
 const EXCELLENCE_WEIGHT_SPIKE = 1.0;
 const EXCELLENCE_WEIGHT_BLOCK = 1.0;
 /** 우수/노력 현재 계산값에 동일하게 곱한다. */
-const RANKING_INDEX_SCALE = 2;
+const RANKING_INDEX_SCALE = 2.5;
 
 const TEAM_FILTER_VALUES = ['ALL', '2', '3', '4'] as const;
 type TeamFilterValue = typeof TEAM_FILTER_VALUES[number];
@@ -312,7 +312,7 @@ export const AssessmentRankingScreen: React.FC<AssessmentRankingScreenProps> = (
                         <div className="bg-slate-800/60 border border-slate-600 rounded-lg p-4 mb-4">
                             <h3 className="text-sm font-bold text-slate-300 mb-2">⭐ 우수 학생 부문 점수 공식</h3>
                             <p className="text-slate-400 text-sm mb-2">
-                                (득점×1 + 에이스×1 + 스파이크×1 + 블로킹×1) × 2
+                                (득점×1 + 에이스×1 + 스파이크×1 + 블로킹×1) × 2.5
                             </p>
                             <table className="text-sm text-slate-400 w-full max-w-xs">
                                 <tbody>
@@ -323,7 +323,7 @@ export const AssessmentRankingScreen: React.FC<AssessmentRankingScreenProps> = (
                                 </tbody>
                             </table>
                             <p className="text-slate-500 text-xs mt-2">
-                                예: (10×1 + 2×1 + 5×1 + 3×1) × 2 = 20 × 2 = 40점
+                                예: (10×1 + 2×1 + 5×1 + 3×1) × 2.5 = 20 × 2.5 = 50점
                             </p>
                         </div>
                         {filteredPlayers.length === 0 ? (
@@ -338,7 +338,7 @@ export const AssessmentRankingScreen: React.FC<AssessmentRankingScreenProps> = (
                         <div className="bg-slate-800/60 border border-slate-600 rounded-lg p-4 mb-4">
                             <h3 className="text-sm font-bold text-slate-300 mb-2">🔥 노력 학생 부문 점수 공식</h3>
                             <p className="text-slate-400 text-sm mb-2">
-                                (노력상×2 + 디그×1 + 서브 In×0.5 + 어시스트×0.5) × 2
+                                (노력상×2 + 디그×1 + 서브 In×0.5 + 어시스트×0.5) × 2.5
                             </p>
                             <table className="text-sm text-slate-400 w-full max-w-xs">
                                 <tbody>
@@ -349,7 +349,7 @@ export const AssessmentRankingScreen: React.FC<AssessmentRankingScreenProps> = (
                                 </tbody>
                             </table>
                             <p className="text-slate-500 text-xs mt-2">
-                                예: (2×2 + 5×1 + 3×0.5 + 4×0.5) × 2 = 12.5 × 2 = 25점
+                                예: (2×2 + 5×1 + 3×0.5 + 4×0.5) × 2.5 = 12.5 × 2.5 = 31.25점
                             </p>
                         </div>
                         {filteredPlayers.length === 0 ? (
