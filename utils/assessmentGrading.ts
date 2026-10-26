@@ -532,6 +532,48 @@ export const meetsHalfParticipation = (played: number, teamMatches: number): boo
     return played * 2 >= teamMatches;
 };
 
+type ParticipationSide = {
+    onCourtPlayerIds?: string[] | null;
+};
+
+type ParticipationMatch = {
+    teamA?: ParticipationSide | null;
+    teamB?: ParticipationSide | null;
+    eventHistory?: { substitution?: { team?: 'A' | 'B'; playerIn?: string; playerOut?: string } | null }[] | null;
+};
+
+/** 경기 시작 출석 체크 명단. 이후 교체는 되돌린다. */
+export const startingAttendanceIds = (match: ParticipationMatch): Set<string> => {
+    const courtA = [...(match.teamA?.onCourtPlayerIds ?? [])];
+    const courtB = [...(match.teamB?.onCourtPlayerIds ?? [])];
+    const events = [...(match.eventHistory ?? [])].reverse();
+    for (const event of events) {
+        const sub = event?.substitution;
+        if (!sub?.playerIn || !sub?.playerOut) continue;
+        const court = sub.team === 'B'
+            ? courtB
+            : sub.team === 'A'
+                ? courtA
+                : courtA.includes(sub.playerIn) ? courtA : courtB;
+        const slot = court.indexOf(sub.playerIn);
+        if (slot !== -1) court[slot] = sub.playerOut;
+    }
+    return new Set([...courtA, ...courtB].filter(Boolean));
+};
+
+/**
+ * 경기 시작 때 출석 명단에 체크된 학생만 참여로 센다.
+ * 체크되지 않은 학생은 나중에 교체로 들어가거나 기록이 있어도 미참여이다.
+ */
+export const playerPlayedInMatch = (match: ParticipationMatch, ids: Set<string>): boolean => {
+    const attended = startingAttendanceIds(match);
+    if (attended.size === 0) return false;
+    for (const id of ids) {
+        if (attended.has(id)) return true;
+    }
+    return false;
+};
+
 export const teamPointsForStudent = (input: {
     played: number;
     teamMatches: number;

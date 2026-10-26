@@ -3,7 +3,7 @@ import localforage from 'localforage';
 import { useData } from '../contexts/DataContext';
 import type { MatchState, Player, PlayerStats, TeamSet } from '../types';
 import { RetroactiveHustleModal } from '../components/RetroactiveHustleModal';
-import { applyRetroactiveHustle, collectAssessmentHustlePlayerIds, collectHustlePlayerIds } from '../utils/hustleAssignment';
+import { applyRetroactiveHustle, collectAssessmentHustlePlayerIds } from '../utils/hustleAssignment';
 import {
     INDIVIDUAL_RUBRIC,
     OFFICIAL_INDEX_SCALE,
@@ -29,6 +29,7 @@ import {
     mergeConfig,
     rubricLabel,
     personalEvaluation,
+    playerPlayedInMatch,
     teamPointsForStudent,
     withGradeEdit,
     withoutGradeLock,
@@ -80,17 +81,6 @@ const blankStats = (): IndexStats => ({
     points: 0, serviceAces: 0, spikeSuccesses: 0, blockingPoints: 0, digs: 0, serveIn: 0, assists: 0, hustles: 0,
 });
 
-const playerAppears = (match: MatchState, ids: Set<string>): boolean => {
-    const sides = [match.teamA, match.teamB];
-    for (const team of sides) {
-        if (!team) continue;
-        if (team.playerStats && Object.keys(team.playerStats).some(id => ids.has(id))) return true;
-        if (team.players && Object.keys(team.players).some(id => ids.has(id))) return true;
-        if ([...(team.onCourtPlayerIds ?? []), ...(team.benchPlayerIds ?? [])].some(id => ids.has(id))) return true;
-    }
-    return collectHustlePlayerIds(match).some(id => ids.has(id));
-};
-
 const downloadText = (filename: string, text: string, type: string) => {
     const blob = new Blob([text], { type });
     const url = URL.createObjectURL(blob);
@@ -126,6 +116,15 @@ const excelCell = (value: string | number | null | undefined, asText = false) =>
 const formatRatio = (value: number) => (Number.isFinite(value) ? value.toFixed(3) : '실점 0');
 
 const maxScore = (values: number[]) => values.reduce((best, value) => Math.max(best, value), 0);
+
+const countByScore = (values: (number | null | undefined)[]) => {
+    const counts = new Map<number, number>();
+    values.forEach(value => {
+        if (typeof value !== 'number') return;
+        counts.set(value, (counts.get(value) ?? 0) + 1);
+    });
+    return counts;
+};
 
 const sourceLabel = (source: string) => {
     if (source === 'excellence') return '우수';
@@ -310,13 +309,13 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                 summed.assists += stat.assists;
             });
             summed.hustles = Math.max(0, ...[...ids].map(id => perId.get(id)?.hustles ?? 0));
-            const participated = scoped.some(match => playerAppears(match, ids));
+            const participated = scoped.some(match => playerPlayedInMatch(match, ids));
 
             const roster = selectedSet.teams.filter(team => people.some(player => team.playerIds.includes(player.id)));
             const appearances = roster.map(team => {
                 const teamKey = teamKeyOf(selectedSet.id, team.teamName);
                 const teamMatches = included.filter(match => match.raw.teamA.key === teamKey || match.raw.teamB.key === teamKey);
-                const played = teamMatches.filter(match => playerAppears(match.raw, ids)).length;
+                const played = teamMatches.filter(match => playerPlayedInMatch(match.raw, ids)).length;
                 return { team, teamKey, teamMatches: teamMatches.length, played };
             }).sort((left, right) => right.played - left.played);
             const chosen = appearances[0];
@@ -393,16 +392,36 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
     }, [students, teamFilter, nameQuery, editedOnly, warningOnly, sortBy]);
 
     const rankBars = useMemo(() => {
+        if (noGradingMatches) return [];
         const counts = new Map<string, number>();
         students.forEach(student => {
-            const found = config.rankPoints.find(item => item.rank === student.rank);
-            const label = found ? String(found.score) : '없음';
+            const label = student.teamComputed == null ? '없음' : String(student.teamComputed);
             counts.set(label, (counts.get(label) ?? 0) + 1);
         });
         return [...counts.entries()]
             .map(([label, count]) => ({ label, count }))
             .sort((left, right) => (Number(right.label) || -1) - (Number(left.label) || -1));
-    }, [students, config.rankPoints]);
+    }, [students, noGradingMatches]);
+
+    const portfolioCounts = useMemo(() => countByScore(students.map(student => student.displayed.portfolio)), [students]);
+    const teamCounts = useMemo(
+        () => (noGradingMatches ? new Map<number, number>() : countByScore(students.map(student => student.teamComputed))),
+        [students, noGradingMatches],
+    );
+    const individualCounts = useMemo(
+        () => (noGradingMatches ? new Map<number, number>() : countByScore(students.map(student => student.personal.score))),
+        [students, noGradingMatches],
+    );
+    const roleCounts = useMemo(
+        () => (noGradingMatches
+            ? new Map<number, number>()
+            : countByScore(students.map(student => applyGradeLocks({
+                team: null,
+                individual: 0,
+                roleCount: combinedRoleCount(student.roleDuties, student.gamesPlayed),
+            }, {}, config).role))),
+        [students, noGradingMatches, config],
+    );
 
     const roleBars = useMemo(() => {
         const counts = new Map<number, number>();
@@ -708,10 +727,10 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                             )}
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <RubricCard title={`데이터 기반 포트폴리오 (10)`} rows={PORTFOLIO_RUBRIC} />
-                            <RubricCard title={`팀 평가 (30)`} rows={TEAM_RUBRIC} note="모둠원에게 같은 점수를 주고, 승패는 게임 포인트+3단 플레이+페어플레이 합계로 정합니다. 승 3·무 1·패 0점이며 동률이면 득실율→세트 득실→승자승입니다." />
-                            <RubricCard title={`리그전 개인 평가 (10)`} rows={INDIVIDUAL_RUBRIC} note={`우수 지수 또는 노력 지수 중 높은 쪽에 구간을 적용합니다. 랭킹 보드와 같은 배율 ×${OFFICIAL_INDEX_SCALE}을 곱합니다.`} />
-                            <RubricCard title={`역할 수행 (10)`} rows={ROLE_RUBRIC} note="기록관·주심·선심·아나운서·카메라감독 횟수와 선수로 뛴 경기를 합산합니다." />
+                            <RubricCard title={`데이터 기반 포트폴리오 (10)`} rows={PORTFOLIO_RUBRIC} counts={portfolioCounts} />
+                            <RubricCard title={`팀 평가 (30)`} rows={TEAM_RUBRIC} counts={teamCounts} note="모둠원에게 같은 점수를 주고, 승패는 게임 포인트+3단 플레이+페어플레이 합계로 정합니다. 승 3·무 1·패 0점이며 동률이면 득실율→세트 득실→승자승입니다." />
+                            <RubricCard title={`리그전 개인 평가 (10)`} rows={INDIVIDUAL_RUBRIC} counts={individualCounts} note={`우수 지수 또는 노력 지수 중 높은 쪽에 구간을 적용합니다. 랭킹 보드와 같은 배율 ×${OFFICIAL_INDEX_SCALE}을 곱합니다.`} />
+                            <RubricCard title={`역할 수행 (10)`} rows={ROLE_RUBRIC} counts={roleCounts} note="기록관·주심·선심·아나운서·카메라감독 횟수와 선수로 뛴 경기를 합산합니다." />
                         </div>
                         <p className="text-sm text-slate-400">전입으로 성적 산출 근거가 없는 경우는 학업성적관리 규정에 따릅니다. 이 점수는 관찰 기록을 바탕으로 최종 협의하여 부여합니다.</p>
                         <p className="text-sm text-slate-400">개인 지수 범위: {indexScopeLabel(config.indexScope)}. 팀 순위와 참여 횟수는 체크된 채점 경기만 사용합니다. 누적은 완료 경기 전체를, 수행평가 경기만은 수행평가로 표시된 경기만 읽습니다.</p>
@@ -1108,16 +1127,17 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
     );
 }
 
-function RubricCard({ title, rows, note }: { title: string; rows: { score: number; label: string }[]; note?: string }) {
+function RubricCard({ title, rows, note, counts }: { title: string; rows: { score: number; label: string }[]; note?: string; counts?: Map<number, number> }) {
     return (
         <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-3 space-y-2">
             <h3 className="font-semibold text-slate-100">{title}</h3>
             {note && <p className="text-sm text-slate-400">{note}</p>}
             <ul className="space-y-1.5">
                 {rows.map(row => (
-                    <li key={row.score} className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-2 text-sm">
+                    <li key={row.score} className="grid grid-cols-[2.5rem_minmax(0,1fr)_auto] gap-2 text-sm">
                         <span className="tabular-nums text-right font-semibold text-slate-100">{row.score}</span>
                         <span className="text-slate-300">{row.label}</span>
+                        {counts && <span className="tabular-nums text-slate-400">{counts.get(row.score) ?? 0}명</span>}
                     </li>
                 ))}
             </ul>

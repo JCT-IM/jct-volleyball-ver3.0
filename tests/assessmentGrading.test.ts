@@ -17,6 +17,7 @@ import {
     individualDistribution,
     meetsHalfParticipation,
     personalEvaluation,
+    playerPlayedInMatch,
     teamPointsForStudent,
     type IndexStats,
     type StandingMatchInput,
@@ -231,6 +232,29 @@ test('역할 횟수는 역할 수행과 선수 출전을 합치고, 포트폴리
     assert.equal(bulk.a.locks.portfolio, 10);
     assert.equal(bulk.b.locks.portfolio, 10);
     assert.equal(bulk.c, undefined);
+});
+
+test('경기 시작 때 체크된 명단만 출석으로 센다', () => {
+    const match = {
+        teamA: { onCourtPlayerIds: ['starter'] },
+        teamB: { onCourtPlayerIds: ['opp'] },
+        eventHistory: [],
+    };
+    assert.equal(playerPlayedInMatch(match, new Set(['bench'])), false);
+    assert.equal(playerPlayedInMatch(match, new Set(['starter'])), true);
+
+    const afterSub = {
+        teamA: { onCourtPlayerIds: ['bench'] },
+        teamB: { onCourtPlayerIds: ['opp'] },
+        eventHistory: [{ substitution: { team: 'A' as const, playerIn: 'bench', playerOut: 'starter' } }],
+    };
+    assert.equal(playerPlayedInMatch(afterSub, new Set(['starter'])), true);
+    assert.equal(playerPlayedInMatch(afterSub, new Set(['bench'])), false);
+    assert.equal(playerPlayedInMatch({
+        teamA: { onCourtPlayerIds: ['starter'] },
+        teamB: { onCourtPlayerIds: ['opp'] },
+        eventHistory: [],
+    }, new Set(['bench'])), false);
 });
 
 test('같은 날짜와 대진이 두 건 이상이면 알리고 항목 수는 줄이지 않는다', () => {
