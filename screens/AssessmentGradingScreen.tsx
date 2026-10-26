@@ -5,17 +5,29 @@ import type { MatchState, Player, PlayerStats, TeamSet } from '../types';
 import { RetroactiveHustleModal } from '../components/RetroactiveHustleModal';
 import { applyRetroactiveHustle, collectAssessmentHustlePlayerIds, collectHustlePlayerIds } from '../utils/hustleAssignment';
 import {
+    INDIVIDUAL_RUBRIC,
+    OFFICIAL_INDEX_SCALE,
+    PORTFOLIO_RUBRIC,
+    ROLE_RUBRIC,
+    TEAM_RUBRIC,
+    applyFieldLocks,
     applyGradeLocks,
     buildStandings,
+    combinedRoleCount,
     defaultAssessmentConfig,
+    describeIndividualBand,
     duplicateRoleKeys,
+    expectedGamesPerTeam,
+    matchesOfficialConfig,
     emptyStudentEdits,
     extractMatchTotals,
     gradingMatchKey,
     indexScopeLabel,
     individualDistribution,
     isMatchIncluded,
+    meetsHalfParticipation,
     mergeConfig,
+    rubricLabel,
     personalEvaluation,
     teamPointsForStudent,
     withGradeEdit,
@@ -135,6 +147,7 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
     const [editMatch, setEditMatch] = useState<{ storageId: string; match: MatchState } | null>(null);
     const [editingCell, setEditingCell] = useState<string | null>(null);
     const [expandedKey, setExpandedKey] = useState<string | null>(null);
+    const [explainField, setExplainField] = useState<GradeField | null>(null);
     const [teamFilter, setTeamFilter] = useState('ALL');
     const [nameQuery, setNameQuery] = useState('');
     const [editedOnly, setEditedOnly] = useState(false);
@@ -170,6 +183,8 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
         return { setId, config: defaultAssessmentConfig(), inclusion: {}, students: {} };
     }, [store, setId]);
     const config = book.config;
+    const teamCount = selectedSet?.teamCount ?? selectedSet?.teams.length ?? 0;
+    const expectedPerTeam = expectedGamesPerTeam(config.expectedTeamMatchCount, teamCount);
 
     const updateBook = (next: ClassGradebook) => {
         setStore(prev => ({ ...prev, books: { ...prev.books, [next.setId]: next } }));
@@ -314,11 +329,14 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
             });
             const personal = personalEvaluation(participated, summed, config);
             const roleEntries = people.flatMap(player => player.roleHistory ?? []);
+            const gamesPlayed = chosen?.played ?? 0;
+            const roleDuties = roleEntries.length;
+            const roleCount = combinedRoleCount(roleDuties, gamesPlayed);
             const edits = book.students[key] ?? emptyStudentEdits();
             const displayed = applyGradeLocks({
                 team: teamComputed,
                 individual: personal.score,
-                roleCount: roleEntries.length,
+                roleCount,
             }, edits.locks, config);
             const numbers = [displayed.portfolio, displayed.team, displayed.individual, displayed.role];
             const total = numbers.every(value => typeof value === 'number') ? numbers.reduce((sum, value) => sum + (value as number), 0) : null;
@@ -336,6 +354,8 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                 teamComputed,
                 personal,
                 roleEntries,
+                roleDuties,
+                gamesPlayed,
                 duplicateRoles: duplicateRoleKeys(roleEntries),
                 edits,
                 displayed,
@@ -387,7 +407,7 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
     const roleBars = useMemo(() => {
         const counts = new Map<number, number>();
         students.forEach(student => {
-            const score = applyGradeLocks({ team: null, individual: 0, roleCount: student.roleEntries.length }, {}, config).role;
+            const score = applyGradeLocks({ team: null, individual: 0, roleCount: combinedRoleCount(student.roleDuties, student.gamesPlayed) }, {}, config).role;
             counts.set(score, (counts.get(score) ?? 0) + 1);
         });
         return [...counts.entries()]
@@ -397,10 +417,10 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
 
     const warnings = useMemo(() => {
         const items: { id: string; label: string; section: 'matches' | 'standings' | 'students'; target: string; studentKey?: string }[] = [];
-        standings.filter(row => row.played !== config.expectedTeamMatchCount).forEach(row => {
+        standings.filter(row => row.played !== expectedPerTeam).forEach(row => {
             items.push({
                 id: `count-${row.key}`,
-                label: `${row.name} 경기 수 ${row.played}경기 (기준 ${config.expectedTeamMatchCount}경기)`,
+                label: `${row.name} 경기 수 ${row.played}경기 (기준 팀당 ${expectedPerTeam}경기 · 전체 ${config.expectedTeamMatchCount}경기)`,
                 section: 'standings',
                 target: `standing-${row.key}`,
             });
@@ -423,7 +443,7 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
             });
         });
         return items;
-    }, [standings, config.expectedTeamMatchCount, listedMatches, students]);
+    }, [standings, expectedPerTeam, config.expectedTeamMatchCount, listedMatches, students]);
 
     const criteriaSummary = `팀 ${maxScore(config.rankPoints.map(item => item.score))}·개인 ${maxScore(config.individualBands.map(item => item.score))}·역할 ${maxScore(config.roleBands.map(item => item.score))}·포트폴리오 ${maxScore(config.portfolioOptions)} / 개인 지수: ${config.indexScope === 'assessment' ? '수행평가 경기만' : '누적'} ×${config.indexScale} / 득실율: ${config.ratioBasis === 'rally' ? '랠리 점수' : '합계'}`;
 
@@ -438,6 +458,15 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
         }, 40);
     };
 
+    const official = matchesOfficialConfig(config);
+
+    const applyOfficialRubric = () => {
+        if (!window.confirm('2026학년도 체육과 2학기 배구 평가표 기준으로 채점 구간, 합계 승패(게임 포인트+3단 플레이+페어플레이), 지수 배율 2.5를 넣습니다. 학생별 수정 잠금은 그대로입니다.')) return;
+        updateBook({ ...book, config: defaultAssessmentConfig() });
+        showToast('2026 공식 채점표를 적용했습니다.', 'success');
+        setSections(prev => ({ ...prev, criteria: true }));
+    };
+
     const applyPortfolioBulk = () => {
         const targets = students.filter(student => bulkTeam === 'ALL' || student.teamName === bulkTeam);
         if (targets.length === 0) {
@@ -446,10 +475,23 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
         }
         const scope = bulkTeam === 'ALL' ? '전체 학생' : `${bulkTeam} 학생`;
         if (!window.confirm(`${scope} ${targets.length}명의 포트폴리오를 10점으로 넣습니다. 이미 10점인 칸은 그대로 둡니다.`)) return;
-        targets.forEach(student => commit(student.key, 'portfolio', student.displayed.portfolio, 10));
+        updateBook({
+            ...book,
+            students: applyFieldLocks(
+                book.students,
+                targets.map(student => ({ key: student.key, field: 'portfolio' as const, from: student.displayed.portfolio, to: 10 })),
+                new Date().toISOString(),
+            ),
+        });
     };
 
     const teamColor = (name: string) => selectedSet?.teams.find(team => team.teamName === name)?.color || '#64748b';
+
+    const openExplain = (studentKey: string, field: GradeField) => {
+        setExpandedKey(studentKey);
+        setExplainField(field);
+        setEditingCell(null);
+    };
 
     const commit = (studentKey: string, field: GradeField, from: number | null, to: number | null) => {
         if (from === to) return;
@@ -617,6 +659,13 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                     <span className={`shrink-0 rounded-md border px-3 py-2 text-sm font-semibold ${warnings.length > 0 ? 'border-amber-500/60 bg-amber-950/50 text-amber-200' : 'border-slate-600 bg-slate-800 text-slate-300'}`}>
                         경고 {warnings.length}
                     </span>
+                    {official ? (
+                        <span className="shrink-0 rounded-md border border-slate-500 bg-slate-800 px-3 py-2 text-sm text-slate-200">2026 공식 채점표</span>
+                    ) : (
+                        <button type="button" onClick={applyOfficialRubric} className="shrink-0 bg-amber-600 hover:bg-amber-500 text-white font-semibold px-3 py-2 rounded-lg text-sm">
+                            2026 채점표 적용
+                        </button>
+                    )}
                     <button type="button" onClick={exportCsv} className="shrink-0 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-3 py-2 rounded-lg text-sm">CSV</button>
                     <button type="button" onClick={exportExcel} className="shrink-0 bg-emerald-700 hover:bg-emerald-600 text-white font-semibold px-3 py-2 rounded-lg text-sm">엑셀</button>
                     <button type="button" onClick={exportJson} className="shrink-0 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-3 py-2 rounded-lg text-sm">JSON 백업</button>
@@ -650,7 +699,21 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                 </button>
                 {sections.criteria && (
                     <div className="px-4 pb-4 space-y-4">
-                        <p className="text-sm text-slate-300">{criteriaSummary}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm text-slate-300">{criteriaSummary}</p>
+                            {official ? (
+                                <span className="text-sm text-slate-400">2026 공식 채점표와 같습니다.</span>
+                            ) : (
+                                <button type="button" onClick={applyOfficialRubric} className="text-sm font-semibold text-amber-200 underline">2026 공식 채점표 적용</button>
+                            )}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <RubricCard title={`데이터 기반 포트폴리오 (10)`} rows={PORTFOLIO_RUBRIC} />
+                            <RubricCard title={`팀 평가 (30)`} rows={TEAM_RUBRIC} note="모둠원에게 같은 점수를 주고, 승패는 게임 포인트+3단 플레이+페어플레이 합계로 정합니다. 승 3·무 1·패 0점이며 동률이면 득실율→세트 득실→승자승입니다." />
+                            <RubricCard title={`리그전 개인 평가 (10)`} rows={INDIVIDUAL_RUBRIC} note={`우수 지수 또는 노력 지수 중 높은 쪽에 구간을 적용합니다. 랭킹 보드와 같은 배율 ×${OFFICIAL_INDEX_SCALE}을 곱합니다.`} />
+                            <RubricCard title={`역할 수행 (10)`} rows={ROLE_RUBRIC} note="기록관·주심·선심·아나운서·카메라감독 횟수와 선수로 뛴 경기를 합산합니다." />
+                        </div>
+                        <p className="text-sm text-slate-400">전입으로 성적 산출 근거가 없는 경우는 학업성적관리 규정에 따릅니다. 이 점수는 관찰 기록을 바탕으로 최종 협의하여 부여합니다.</p>
                         <p className="text-sm text-slate-400">개인 지수 범위: {indexScopeLabel(config.indexScope)}. 팀 순위와 참여 횟수는 체크된 채점 경기만 사용합니다. 누적은 완료 경기 전체를, 수행평가 경기만은 수행평가로 표시된 경기만 읽습니다.</p>
                         <div className="flex flex-wrap gap-x-4 gap-y-3 text-sm text-slate-200">
                             <label className="inline-flex items-center">승점 <NumberBox value={config.winPoints} onCommit={value => patchConfig({ winPoints: value })} /></label>
@@ -658,7 +721,8 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                             <label className="inline-flex items-center">패점 <NumberBox value={config.lossPoints} onCommit={value => patchConfig({ lossPoints: value })} /></label>
                             <label className="inline-flex items-center">참여 미달 <NumberBox value={config.teamPartialScore} onCommit={value => patchConfig({ teamPartialScore: value })} /></label>
                             <label className="inline-flex items-center">팀 미참여 <NumberBox value={config.teamAbsentScore} onCommit={value => patchConfig({ teamAbsentScore: value })} /></label>
-                            <label className="inline-flex items-center">팀당 예상 경기 수 <NumberBox value={config.expectedTeamMatchCount} onCommit={value => patchConfig({ expectedTeamMatchCount: value })} /></label>
+                            <label className="inline-flex items-center">전체 경기 수 <NumberBox value={config.expectedTeamMatchCount} onCommit={value => patchConfig({ expectedTeamMatchCount: value })} /></label>
+                            <span className="text-sm text-slate-400">팀당 {expectedPerTeam}경기{teamCount > 0 ? ` (${teamCount}팀)` : ''}</span>
                         </div>
                         <fieldset className="space-y-1 text-sm">
                             <legend className="font-semibold text-slate-100">점수 득실율</legend>
@@ -744,7 +808,12 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                                                 <td className="p-2 align-top break-words">{match.dateLabel}</td>
                                                 <td className="p-2 align-top min-w-0">
                                                     <p className="break-words">{match.raw.teamA.name} {match.totals.sumA} : {match.totals.sumB} {match.raw.teamB.name}</p>
-                                                    <p className="text-slate-400 mt-1">합계 {outcome} · 기록 {recorded}</p>
+                                                    <p className="text-slate-400 mt-1">
+                                                        게임 {match.totals.rallyA}:{match.totals.rallyB}
+                                                        {' · '}3단 {match.raw.teamA.threeHitPlays ?? 0}:{match.raw.teamB.threeHitPlays ?? 0}
+                                                        {' · '}페어 {match.raw.teamA.fairPlay ?? 0}:{match.raw.teamB.fairPlay ?? 0}
+                                                    </p>
+                                                    <p className="text-slate-400 mt-1">합계 승자 {outcome} · 기록 승자 {recorded}</p>
                                                     {match.included && match.totals.differs && <p className="text-rose-300 font-semibold mt-1">결과 달라짐</p>}
                                                 </td>
                                                 <td className="p-2 align-top text-right">
@@ -777,7 +846,8 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                     {!sections.standings && <span className="text-sm text-slate-400 truncate">{standings.length}팀</span>}
                 </button>
                 {sections.standings && (
-                    <div className="px-4 pb-4">
+                    <div className="px-4 pb-4 space-y-2">
+                        <p className="text-sm text-slate-400">승점은 합계(게임 포인트+3단 플레이+페어플레이) 승패로 줍니다. 동률이면 {config.ratioBasis === 'rally' ? '랠리 점수' : '합계'} 득실율 → 세트 득실 → 승자승입니다.</p>
                         <table className="w-full table-fixed text-sm text-slate-200">
                             <thead className="text-slate-300">
                                 <tr>
@@ -799,7 +869,7 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                                                 <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: teamColor(row.name) }} aria-hidden />
                                                 <span className="truncate">{row.name}</span>
                                             </span>
-                                            {row.played !== config.expectedTeamMatchCount && <span className="block text-amber-200 font-semibold">경기 수 불일치</span>}
+                                            {row.played !== expectedPerTeam && <span className="block text-amber-200 font-semibold">경기 수 불일치</span>}
                                         </td>
                                         <td className="p-2 text-right tabular-nums">{row.played}</td>
                                         <td className="p-2 text-right tabular-nums">{row.points}</td>
@@ -894,7 +964,7 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                                             <React.Fragment key={student.key}>
                                                 <tr id={`student-${student.key}`} className="border-t border-slate-800 scroll-mt-28">
                                                     <td className="px-2 py-3 align-middle">
-                                                        <button type="button" onClick={() => setExpandedKey(open ? null : student.key)} aria-expanded={open} aria-label={`${student.player.originalName} 근거`} className="text-slate-300">
+                                                        <button type="button" onClick={() => { setExpandedKey(open ? null : student.key); setExplainField(null); }} aria-expanded={open} aria-label={`${student.player.originalName} 근거`} className="text-slate-300">
                                                             {open ? '▾' : '▸'}
                                                         </button>
                                                     </td>
@@ -913,7 +983,9 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                                                             locked={student.displayed.locked.portfolio}
                                                             emphasize
                                                             options={portfolioOptions}
+                                                            optionLabels={Object.fromEntries(PORTFOLIO_RUBRIC.map(row => [row.score, row.label]))}
                                                             onOpen={() => setEditingCell(`${student.key}:portfolio`)}
+                                                            onExplain={() => openExplain(student.key, 'portfolio')}
                                                             onClose={() => setEditingCell(null)}
                                                             onCommit={value => commit(student.key, 'portfolio', student.displayed.portfolio, value)}
                                                             onUnlock={() => unlock(student.key, 'portfolio', student.displayed.portfolio)}
@@ -927,6 +999,7 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                                                             dash={noGradingMatches && !student.displayed.locked.team}
                                                             locked={student.displayed.locked.team}
                                                             onOpen={() => setEditingCell(`${student.key}:team`)}
+                                                            onExplain={() => openExplain(student.key, 'team')}
                                                             onClose={() => setEditingCell(null)}
                                                             onCommit={value => { if (value != null) commit(student.key, 'team', student.displayed.team, value); }}
                                                             onUnlock={() => unlock(student.key, 'team', student.displayed.team)}
@@ -940,6 +1013,7 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                                                             dash={noGradingMatches && !student.displayed.locked.individual}
                                                             locked={student.displayed.locked.individual}
                                                             onOpen={() => setEditingCell(`${student.key}:individual`)}
+                                                            onExplain={() => openExplain(student.key, 'individual')}
                                                             onClose={() => setEditingCell(null)}
                                                             onCommit={value => { if (value != null) commit(student.key, 'individual', student.displayed.individual, value); }}
                                                             onUnlock={() => unlock(student.key, 'individual', student.displayed.individual)}
@@ -953,6 +1027,7 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                                                             dash={noGradingMatches && !student.displayed.locked.role}
                                                             locked={student.displayed.locked.role}
                                                             onOpen={() => setEditingCell(`${student.key}:role`)}
+                                                            onExplain={() => openExplain(student.key, 'role')}
                                                             onClose={() => setEditingCell(null)}
                                                             onCommit={value => { if (value != null) commit(student.key, 'role', student.displayed.role, value); }}
                                                             onUnlock={() => unlock(student.key, 'role', student.displayed.role)}
@@ -977,9 +1052,16 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                                                 {open && (
                                                     <tr className="bg-slate-950/70">
                                                         <td colSpan={10} className="px-4 py-3 text-sm text-slate-300">
-                                                            <p>참여 {student.played}/{student.teamMatches} · 우수 {student.personal.excellence} · 노력 {student.personal.effort} · 반영 {sourceLabel(student.personal.source)} {student.personal.chosen}</p>
-                                                            <div className="mt-2 flex flex-wrap items-center gap-3">
-                                                                <span>역할 횟수</span>
+                                                            <ScoreReason
+                                                                student={student}
+                                                                field={explainField}
+                                                                config={config}
+                                                                noGradingMatches={noGradingMatches}
+                                                                roleComputed={roleComputed}
+                                                                onEdit={field => setEditingCell(`${student.key}:${field}`)}
+                                                            />
+                                                            <div className="mt-3 flex flex-wrap items-center gap-3">
+                                                                <span>역할 횟수 수정</span>
                                                                 <ScoreCell
                                                                     active={editingCell === `${student.key}:roleCount`}
                                                                     value={student.displayed.roleCount}
@@ -990,7 +1072,6 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                                                                     onUnlock={() => unlock(student.key, 'roleCount', student.displayed.roleCount)}
                                                                     onHistory={() => setHistoryKey(student.key)}
                                                                 />
-                                                                {!noGradingMatches && <span className="text-slate-400">계산 역할 점수 {roleComputed}</span>}
                                                                 {student.duplicateRoles.length > 0 && <span className="font-semibold text-rose-300">같은 날짜·대진 {student.duplicateRoles.length}묶음</span>}
                                                             </div>
                                                             {student.otherTeams.length > 0 && <p className="mt-2 text-slate-400">다른 팀 {student.otherTeams.join(', ')}</p>}
@@ -1023,6 +1104,23 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                 onClose={() => setEditMatch(null)}
                 onSave={saveTypeChange}
             />
+        </div>
+    );
+}
+
+function RubricCard({ title, rows, note }: { title: string; rows: { score: number; label: string }[]; note?: string }) {
+    return (
+        <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-3 space-y-2">
+            <h3 className="font-semibold text-slate-100">{title}</h3>
+            {note && <p className="text-sm text-slate-400">{note}</p>}
+            <ul className="space-y-1.5">
+                {rows.map(row => (
+                    <li key={row.score} className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-2 text-sm">
+                        <span className="tabular-nums text-right font-semibold text-slate-100">{row.score}</span>
+                        <span className="text-slate-300">{row.label}</span>
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 }
@@ -1100,6 +1198,87 @@ function BandEditor({ title, rows, minLabel, bars, onChange, onAdd }: {
     );
 }
 
+function formatIndex(value: number): string {
+    if (Number.isInteger(value)) return String(value);
+    return value.toFixed(1);
+}
+
+function ScoreReason({ student, field, config, noGradingMatches, roleComputed, onEdit }: {
+    student: {
+        displayed: { portfolio: number | null; team: number | null; individual: number; role: number; roleCount: number };
+        personal: { excellence: number; effort: number; chosen: number; source: string; score: number };
+        stats: IndexStats;
+        played: number;
+        teamMatches: number;
+        rank: number | null;
+        teamName: string;
+        roleDuties: number;
+        gamesPlayed: number;
+        roleEntries: { role: string; date: string; matchInfo: string }[];
+    };
+    field: GradeField | null;
+    config: AssessmentGradingConfig;
+    noGradingMatches: boolean;
+    roleComputed: number;
+    onEdit: (field: GradeField) => void;
+}) {
+    const scale = config.indexScale;
+    const half = meetsHalfParticipation(student.played, student.teamMatches);
+    const show = (key: GradeField) => field == null || field === key;
+    return (
+        <div className="space-y-3">
+            {show('portfolio') && (
+                <div className={`rounded-lg border px-3 py-2 ${field === 'portfolio' ? 'border-amber-500/60 bg-amber-950/30' : 'border-slate-700'}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-slate-100">포트폴리오 {student.displayed.portfolio ?? '미입력'}</p>
+                        <button type="button" onClick={() => onEdit('portfolio')} className="text-amber-200 underline">수정</button>
+                    </div>
+                    <p className="mt-1">{rubricLabel(PORTFOLIO_RUBRIC, student.displayed.portfolio) ?? '교사가 입력하는 칸입니다.'}</p>
+                </div>
+            )}
+            {show('team') && (
+                <div className={`rounded-lg border px-3 py-2 ${field === 'team' ? 'border-amber-500/60 bg-amber-950/30' : 'border-slate-700'}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-slate-100">팀 평가 {noGradingMatches ? '—' : (student.displayed.team ?? '—')}</p>
+                        <button type="button" onClick={() => onEdit('team')} className="text-amber-200 underline">수정</button>
+                    </div>
+                    <p className="mt-1">{student.teamName || '팀 없음'} · 순위 {student.rank ?? '—'}위 · 참여 {student.played}/{student.teamMatches}{half ? ' · 1/2 참여 충족' : ' · 1/2 참여 미달'}</p>
+                    <p className="mt-1 text-slate-400">{rubricLabel(TEAM_RUBRIC, student.displayed.team) ?? '—'}</p>
+                </div>
+            )}
+            {show('individual') && (
+                <div className={`rounded-lg border px-3 py-2 ${field === 'individual' ? 'border-amber-500/60 bg-amber-950/30' : 'border-slate-700'}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-slate-100">개인 평가 {noGradingMatches ? '—' : student.displayed.individual}</p>
+                        <button type="button" onClick={() => onEdit('individual')} className="text-amber-200 underline">수정</button>
+                    </div>
+                    <p className="mt-1">우수 {formatIndex(student.personal.excellence)} = (득점 {student.stats.points} + 에이스 {student.stats.serviceAces} + 스파이크 {student.stats.spikeSuccesses} + 블로킹 {student.stats.blockingPoints}) × {scale}</p>
+                    <p className="mt-1">노력 {formatIndex(student.personal.effort)} = (노력상 {student.stats.hustles}×2 + 디그 {student.stats.digs} + 서브 In {student.stats.serveIn}×0.5 + 어시스트 {student.stats.assists}×0.5) × {scale}</p>
+                    <p className="mt-1">반영 {sourceLabel(student.personal.source)} {formatIndex(student.personal.chosen)}{student.personal.source !== 'absent' ? ` · ${describeIndividualBand(student.personal.chosen, config)}` : ' · 미참여'}</p>
+                    <p className="mt-1 text-slate-400">{rubricLabel(INDIVIDUAL_RUBRIC, noGradingMatches ? null : student.displayed.individual) ?? '—'}</p>
+                </div>
+            )}
+            {show('role') && (
+                <div className={`rounded-lg border px-3 py-2 ${field === 'role' ? 'border-amber-500/60 bg-amber-950/30' : 'border-slate-700'}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-semibold text-slate-100">역할 {noGradingMatches ? '—' : student.displayed.role}</p>
+                        <button type="button" onClick={() => onEdit('role')} className="text-amber-200 underline">수정</button>
+                    </div>
+                    <p className="mt-1">선수 경기 {student.gamesPlayed} + 역할 수행 {student.roleDuties} = {student.displayed.roleCount}회 → 계산 {roleComputed}점</p>
+                    {student.roleEntries.length > 0 && (
+                        <ul className="mt-1 space-y-0.5 text-slate-400">
+                            {student.roleEntries.map((entry, index) => (
+                                <li key={`${entry.date}-${index}`}>{entry.role} · {entry.date} · {entry.matchInfo}</li>
+                            ))}
+                        </ul>
+                    )}
+                    <p className="mt-1 text-slate-400">{rubricLabel(ROLE_RUBRIC, noGradingMatches ? null : student.displayed.role) ?? '—'}</p>
+                </div>
+            )}
+        </div>
+    );
+}
+
 function ScoreCell({
     active,
     value,
@@ -1107,7 +1286,9 @@ function ScoreCell({
     dash,
     emphasize,
     options,
+    optionLabels,
     onOpen,
+    onExplain,
     onClose,
     onCommit,
     onUnlock,
@@ -1119,7 +1300,9 @@ function ScoreCell({
     dash?: boolean;
     emphasize?: boolean;
     options?: number[];
+    optionLabels?: Record<number, string>;
     onOpen: () => void;
+    onExplain?: () => void;
     onClose: () => void;
     onCommit: (value: number | null) => void;
     onUnlock: () => void;
@@ -1142,7 +1325,7 @@ function ScoreCell({
                 className="w-full bg-slate-900 border border-slate-500 rounded px-2 py-1 text-sm text-right text-slate-100"
             >
                 <option value="">미입력</option>
-                {options.map(option => <option key={option} value={option}>{option}</option>)}
+                {options.map(option => <option key={option} value={option}>{option}{optionLabels?.[option] ? ` · ${optionLabels[option]}` : ''}</option>)}
             </select>
         );
     }
@@ -1174,7 +1357,7 @@ function ScoreCell({
 
     return (
         <div className={emphasize ? 'rounded-md bg-slate-800 ring-1 ring-slate-400 px-2 py-1' : ''}>
-            <button type="button" onClick={onOpen} className="block w-full text-right text-sm tabular-nums font-medium text-slate-100 min-h-7">
+            <button type="button" onClick={onExplain ?? onOpen} className="block w-full text-right text-sm tabular-nums font-medium text-slate-100 min-h-7">
                 {shown}
             </button>
             {locked && (
