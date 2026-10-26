@@ -39,6 +39,7 @@ export interface AssessmentGradingConfig {
     individualAbsentScore: number;
     roleBands: ScoreBand[];
     portfolioOptions: number[];
+    /** 리그 전체 경기 수(라운드). 팀당 경기 수는 팀 수로 나눈다. */
     expectedTeamMatchCount: number;
 }
 
@@ -133,6 +134,79 @@ interface Acc extends StandingRow {
     }[];
 }
 
+/** 클래스 랭킹 보드와 같은 우수/노력 지수 배율. 2026 채점표의 15·10·7 구간에 이 배율을 곱한 값을 넣는다. */
+export const OFFICIAL_INDEX_SCALE = 2.5;
+
+export const PORTFOLIO_RUBRIC: { score: number; label: string }[] = [
+    { score: 10, label: '학습지 누락이 없고, 전술 및 AI 피드백 반영 내용이 매우 구체적임' },
+    { score: 9, label: '학습지 1~2회 누락 또는 전술 및 AI 피드백 내용이 다소 구체적임' },
+    { score: 8, label: '학습지 3~4회 누락 또는 내용이 단편적임' },
+    { score: 7, label: '학습지 절반 이상 누락 또는 내용이 미흡함' },
+    { score: 6, label: '제출은 하였으나 내용이 거의 없음' },
+    { score: 4, label: '미제출 및 미참여' },
+];
+
+export const TEAM_RUBRIC: { score: number; label: string }[] = [
+    { score: 30, label: '리그 팀 평가 1위 모둠' },
+    { score: 28, label: '리그 팀 평가 2위 모둠' },
+    { score: 26, label: '리그 팀 평가 3위 모둠' },
+    { score: 24, label: '리그 팀 평가 4위 모둠' },
+    { score: 22, label: '리그 기간 중 경기에 1/2 이상 참여하지 않음' },
+    { score: 18, label: '미참여 및 미응시' },
+];
+
+export const INDIVIDUAL_RUBRIC: { score: number; label: string }[] = [
+    { score: 10, label: '우수 또는 노력 지수 15점 이상' },
+    { score: 9, label: '우수 또는 노력 지수 10점 이상' },
+    { score: 8, label: '우수 또는 노력 지수 7점 이상' },
+    { score: 7, label: '우수 또는 노력 지수 6점 이하' },
+    { score: 4, label: '미참여 및 미응시' },
+];
+
+export const ROLE_RUBRIC: { score: number; label: string }[] = [
+    { score: 10, label: '6회 이상 참여' },
+    { score: 9, label: '5회 이상 참여' },
+    { score: 8, label: '4회 이상 참여' },
+    { score: 7, label: '3회 이상 참여' },
+    { score: 6, label: '2회 이상 참여' },
+    { score: 5, label: '1회 참여' },
+    { score: 4, label: '미참여 및 미응시' },
+];
+
+export const officialConfigSignature = (config: AssessmentGradingConfig): string => JSON.stringify({
+    rankPoints: config.rankPoints,
+    teamPartialScore: config.teamPartialScore,
+    teamAbsentScore: config.teamAbsentScore,
+    winPoints: config.winPoints,
+    drawPoints: config.drawPoints,
+    lossPoints: config.lossPoints,
+    ratioBasis: config.ratioBasis,
+    indexScope: config.indexScope,
+    indexScale: config.indexScale,
+    individualBands: config.individualBands,
+    individualFallbackScore: config.individualFallbackScore,
+    individualAbsentScore: config.individualAbsentScore,
+    roleBands: config.roleBands,
+    portfolioOptions: config.portfolioOptions,
+    expectedTeamMatchCount: config.expectedTeamMatchCount,
+});
+
+export const matchesOfficialConfig = (config: AssessmentGradingConfig): boolean => (
+    officialConfigSignature(config) === officialConfigSignature(defaultAssessmentConfig())
+);
+
+export const rubricLabel = (rows: { score: number; label: string }[], score: number | null | undefined): string | null => {
+    if (score == null) return null;
+    return rows.find(row => row.score === score)?.label ?? null;
+};
+
+export const describeIndividualBand = (chosen: number, config: AssessmentGradingConfig): string => {
+    const sorted = [...config.individualBands].sort((left, right) => right.minInclusive - left.minInclusive);
+    const band = sorted.find(item => chosen >= item.minInclusive);
+    if (band) return `${band.minInclusive}점 이상 → 개인 ${band.score}점`;
+    return `6점 이하 → 개인 ${config.individualFallbackScore}점`;
+};
+
 export const defaultAssessmentConfig = (): AssessmentGradingConfig => ({
     rankPoints: [
         { rank: 1, score: 30 },
@@ -145,9 +219,9 @@ export const defaultAssessmentConfig = (): AssessmentGradingConfig => ({
     winPoints: 3,
     drawPoints: 1,
     lossPoints: 0,
-    ratioBasis: 'rally',
+    ratioBasis: 'sum',
     indexScope: 'cumulative',
-    indexScale: 2.0,
+    indexScale: OFFICIAL_INDEX_SCALE,
     individualBands: [
         { minInclusive: 15, score: 10 },
         { minInclusive: 10, score: 9 },
@@ -413,6 +487,7 @@ export const buildStandings = (
 
     const rows: StandingRow[] = [];
     let cursor = 0;
+    let nextRank = 1;
     while (cursor < ordered.length) {
         let end = cursor;
         while (
@@ -422,7 +497,8 @@ export const buildStandings = (
         ) {
             end += 1;
         }
-        const rank = cursor + 1;
+        const rank = nextRank;
+        nextRank += 1;
         for (let slot = cursor; slot <= end; slot += 1) {
             const team = ordered[slot].team;
             const scored = options.basis === 'rally' ? team.rallyFor : team.sumFor;
@@ -437,6 +513,12 @@ export const buildStandings = (
         rows.push({ ...rest, rank: null, pointRatio: 0 });
     });
     return rows;
+};
+
+/** 전체 경기 수와 팀 수로 팀당 경기 수를 구한다. 3팀 6경기면 팀당 4경기. */
+export const expectedGamesPerTeam = (totalMatches: number, teamCount: number): number => {
+    if (teamCount <= 0) return totalMatches;
+    return (totalMatches * 2) / teamCount;
 };
 
 export const rankPointScore = (rank: number | null, rankPoints: RankPoint[]): number | null => {
@@ -497,7 +579,7 @@ export const personalEvaluation = (
     if (!participated) {
         return { excellence: 0, effort: 0, chosen: 0, source: 'absent', score: config.individualAbsentScore };
     }
-    const scale = Number.isFinite(config.indexScale) ? config.indexScale : 2.0;
+    const scale = Number.isFinite(config.indexScale) ? config.indexScale : OFFICIAL_INDEX_SCALE;
     const excellence = excellenceIndex(stats) * scale;
     const effort = effortIndex(stats) * scale;
     const chosen = choosePersonalIndex(excellence, effort);
@@ -566,6 +648,25 @@ export const applyGradeLocks = (
             roleCount: hasLock(locks, 'roleCount'),
         },
     };
+};
+
+/** 역할 수행 횟수 = 기록관·주심 등 역할 + 선수로 뛴 경기. */
+export const combinedRoleCount = (roleDuties: number, gamesPlayed: number): number => (
+    Math.max(0, roleDuties) + Math.max(0, gamesPlayed)
+);
+
+export const applyFieldLocks = (
+    students: Record<string, StudentGradeEdits>,
+    updates: { key: string; field: GradeField; from: number | null; to: number | null }[],
+    at: string,
+): Record<string, StudentGradeEdits> => {
+    const next = { ...students };
+    updates.forEach(update => {
+        if (update.from === update.to) return;
+        const current = next[update.key] ?? emptyStudentEdits();
+        next[update.key] = withGradeEdit(current, update.field, update.from, update.to, at);
+    });
+    return next;
 };
 
 export const withGradeEdit = (

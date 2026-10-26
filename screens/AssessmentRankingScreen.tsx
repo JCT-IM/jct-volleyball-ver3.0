@@ -3,6 +3,7 @@ import { useData } from '../contexts/DataContext';
 import { Player, PlayerCumulativeStats, TeamSet } from '../types';
 import { useTranslation } from '../hooks/useTranslation';
 import { collectAssessmentHustlePlayerIds } from '../utils/hustleAssignment';
+import { OFFICIAL_INDEX_SCALE } from '../utils/assessmentGrading';
 
 type TabType = 'excellence' | 'effort';
 
@@ -12,7 +13,7 @@ const EXCELLENCE_WEIGHT_ACE = 1.0;
 const EXCELLENCE_WEIGHT_SPIKE = 1.0;
 const EXCELLENCE_WEIGHT_BLOCK = 1.0;
 /** 우수/노력 현재 계산값에 동일하게 곱한다. */
-const RANKING_INDEX_SCALE = 2.5;
+const RANKING_INDEX_SCALE = OFFICIAL_INDEX_SCALE;
 
 const TEAM_FILTER_VALUES = ['ALL', '2', '3', '4'] as const;
 type TeamFilterValue = typeof TEAM_FILTER_VALUES[number];
