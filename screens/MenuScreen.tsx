@@ -315,7 +315,7 @@ const MenuScreen: React.FC<MenuScreenProps> = ({
                             {isClub && onStartHeatmapAnalysis && <MenuCard icon={<span className="text-xl">🗺️</span>} title="히트맵 분석" description="대회·경기별 득점/실점 위치 풀코트 시각화" onClick={onStartHeatmapAnalysis} />}
                             <MenuCard icon={<IdentificationIcon className="w-6 h-6 sm:w-8 sm:h-8" />} title={t('menu_player_records_title')} description={t('menu_player_records_desc')} onClick={onShowPlayerRecords} />
                             {!isClub && onShowAssessmentRanking && <MenuCard icon={<span className="text-xl">🏆</span>} title="클래스 랭킹 보드" description="경기 스탯 및 참여도 기반 학생 랭킹 확인" onClick={onShowAssessmentRanking} />}
-                            {!isClub && onShowAssessmentGrading && <MenuCard icon={<span className="text-xl">📝</span>} title="수행평가 채점" description="반별 영역 점수와 총점, CSV·백업" onClick={onShowAssessmentGrading} />}
+                            {!isClub && onShowAssessmentGrading && <MenuCard icon={<span className="text-xl">📝</span>} title="수행평가 채점" description="반별 영역 점수와 총점, 엑셀·CSV·백업" onClick={onShowAssessmentGrading} />}
                             {!isClub && <MenuCard icon={<TrophyIcon className="w-6 h-6 sm:w-8 sm:h-8" />} title={t('menu_achievements_title')} description={t('menu_achievements_desc')} onClick={onShowAchievements} />}
                             {!isClub && onShowRoleRecord && <MenuCard icon={<span className="text-xl">📊</span>} title="학생 역할 수행 기록" description="비출전 학생의 경기 역할 수행 이력 확인" onClick={onShowRoleRecord} />}
                         </div>

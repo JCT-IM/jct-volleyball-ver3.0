@@ -95,6 +95,22 @@ const csvCell = (value: string | number | null | undefined) => {
     return text;
 };
 
+const GRADE_EXPORT_HEADERS = ['학번', '이름', '팀', '팀순위', '참여경기', '팀경기수', '포트폴리오', '팀평가', '개인평가', '우수지수', '노력지수', '반영지수', '반영부문', '역할횟수', '역할점수', '역할중복', '총점', '수정항목'] as const;
+
+const xmlEscape = (value: string) => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+
+const excelCell = (value: string | number | null | undefined, asText = false) => {
+    if (value == null || value === '') return '<Cell><Data ss:Type="String"></Data></Cell>';
+    if (!asText && typeof value === 'number' && Number.isFinite(value)) {
+        return `<Cell><Data ss:Type="Number">${value}</Data></Cell>`;
+    }
+    return `<Cell><Data ss:Type="String">${xmlEscape(String(value))}</Data></Cell>`;
+};
+
 const formatRatio = (value: number) => (Number.isFinite(value) ? value.toFixed(3) : '실점 0');
 
 const maxScore = (values: number[]) => values.reduce((best, value) => Math.max(best, value), 0);
@@ -491,37 +507,59 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
         setEditMatch(null);
     };
 
+    const gradeExportRow = (student: (typeof students)[number]) => {
+        const locked = (Object.entries(student.displayed.locked) as [GradeField, boolean][])
+            .filter(([, value]) => value)
+            .map(([field]) => FIELD_LABEL[field])
+            .join(' ');
+        return [
+            student.player.studentNumber,
+            student.player.originalName,
+            student.teamName,
+            student.rank ?? '',
+            student.played,
+            student.teamMatches,
+            student.displayed.portfolio ?? '',
+            student.displayed.team ?? '',
+            student.displayed.individual,
+            student.personal.excellence,
+            student.personal.effort,
+            student.personal.chosen,
+            sourceLabel(student.personal.source),
+            student.displayed.roleCount,
+            student.displayed.role,
+            student.duplicateRoles.length > 0 ? '예' : '',
+            student.total ?? '',
+            locked,
+        ] as const;
+    };
+
     const exportCsv = () => {
         if (!selectedSet) return;
-        const headers = ['학번', '이름', '팀', '팀순위', '참여경기', '팀경기수', '포트폴리오', '팀평가', '개인평가', '우수지수', '노력지수', '반영지수', '반영부문', '역할횟수', '역할점수', '역할중복', '총점', '수정항목'];
-        const lines = [headers.join(',')];
+        const lines = [GRADE_EXPORT_HEADERS.join(',')];
         students.forEach(student => {
-            const locked = (Object.entries(student.displayed.locked) as [GradeField, boolean][])
-                .filter(([, value]) => value)
-                .map(([field]) => FIELD_LABEL[field])
-                .join(' ');
-            lines.push([
-                student.player.studentNumber,
-                student.player.originalName,
-                student.teamName,
-                student.rank ?? '',
-                student.played,
-                student.teamMatches,
-                student.displayed.portfolio ?? '',
-                student.displayed.team ?? '',
-                student.displayed.individual,
-                student.personal.excellence,
-                student.personal.effort,
-                student.personal.chosen,
-                sourceLabel(student.personal.source),
-                student.displayed.roleCount,
-                student.displayed.role,
-                student.duplicateRoles.length > 0 ? '예' : '',
-                student.total ?? '',
-                locked,
-            ].map(csvCell).join(','));
+            lines.push(gradeExportRow(student).map(csvCell).join(','));
         });
         downloadText(`수행평가채점_${selectedSet.className}.csv`, `\uFEFF${lines.join('\n')}`, 'text/csv;charset=utf-8');
+    };
+
+    const exportExcel = () => {
+        if (!selectedSet) return;
+        const textCols = new Set([0, 1, 2, 12, 15, 17]);
+        const headerXml = `<Row>${GRADE_EXPORT_HEADERS.map(header => excelCell(header, true)).join('')}</Row>`;
+        const bodyXml = students.map(student => {
+            const cells = gradeExportRow(student).map((value, index) => excelCell(value, textCols.has(index)));
+            return `<Row>${cells.join('')}</Row>`;
+        }).join('');
+        const sheetName = xmlEscape((selectedSet.className || '채점').slice(0, 31).replace(/[:\\/?*[\]]/g, ' '));
+        const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Worksheet ss:Name="${sheetName}">
+    <Table>${headerXml}${bodyXml}</Table>
+  </Worksheet>
+</Workbook>`;
+        downloadText(`수행평가채점_${selectedSet.className}.xls`, `\uFEFF${xml}`, 'application/vnd.ms-excel');
     };
 
     const exportJson = () => {
@@ -580,6 +618,7 @@ export default function AssessmentGradingScreen({ onBack }: { onBack: () => void
                         경고 {warnings.length}
                     </span>
                     <button type="button" onClick={exportCsv} className="shrink-0 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-3 py-2 rounded-lg text-sm">CSV</button>
+                    <button type="button" onClick={exportExcel} className="shrink-0 bg-emerald-700 hover:bg-emerald-600 text-white font-semibold px-3 py-2 rounded-lg text-sm">엑셀</button>
                     <button type="button" onClick={exportJson} className="shrink-0 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-3 py-2 rounded-lg text-sm">JSON 백업</button>
                     <label className="shrink-0 bg-slate-700 hover:bg-slate-600 text-white font-semibold px-3 py-2 rounded-lg text-sm cursor-pointer">
                         JSON 불러오기
